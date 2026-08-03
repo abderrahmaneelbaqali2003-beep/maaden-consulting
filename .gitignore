@@ -1,0 +1,86 @@
+# ============================================================
+# Backend (Python / FastAPI)
+# ============================================================
+backend/.venv/
+venv/
+env/
+__pycache__/
+backend/**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+backend/build/
+backend/dist/
+
+# Couverture de tests
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# ============================================================
+# Frontend (Node / Vite / React)
+# ============================================================
+frontend/node_modules/
+node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ============================================================
+# Variables d'environnement (secrets - ne jamais committer)
+# ============================================================
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# ============================================================
+# Logs et fichiers de process locaux
+# ============================================================
+*.log
+backend/logs/
+*.pid
+uvicorn_out.log
+uvicorn_err.log
+vite_out.log
+vite_err.log
+
+# ============================================================
+# Scripts de verification temporaires (captures d'ecran, smoke tests)
+# ============================================================
+frontend/_screenshot*.mjs
+**/_screenshot*.mjs
+
+# ============================================================
+# OS / editeurs
+# ============================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.swp
+*.swo
+.vscode/*
+!.vscode/extensions.json
+
+# ============================================================
+# Claude Code (fichiers locaux de session)
+# ============================================================
+.claude/
+
+# ============================================================
+# Donnees : garder data/raw et data/samples versionnes,
+# ignorer uniquement les exports temporaires generes par les imports
+# ============================================================
+data/processed/tmp_*
