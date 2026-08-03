@@ -25,7 +25,7 @@ def list_drivers(
     include_inactive: bool = False,
     sort_by: str = "reference",
     sort_dir: str = "asc",
-    page: int = 2,
+    page: int = 1,
     page_size: int = 20,
 ):
     query = db.query(Driver).options(joinedload(Driver.manufacturer)).join(Manufacturer)
