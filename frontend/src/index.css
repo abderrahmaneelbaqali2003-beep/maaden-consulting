@@ -1,23 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f9fc;
-  --foreground: #0f2438;
+  /* MAADEN Consulting — palette derivee du logo (gris technique + or) */
+  --background: #f5f6f7;
+  --foreground: #20232a;
 
   --card: #ffffff;
-  --card-foreground: #0f2438;
+  --card-foreground: #20232a;
 
-  --primary: #123a5c;
-  --primary-foreground: #ffffff;
+  /* Or MAADEN — CTA, elements selectionnes / actifs */
+  --primary: #b8892e;
+  --primary-foreground: #211b10;
 
-  --secondary: #1d6fae;
+  /* Bleu-gris sobre — liens et elements informatifs */
+  --secondary: #2e5c82;
   --secondary-foreground: #ffffff;
+  --secondary-bg: #eaf1f7;
 
-  --muted: #eef2f7;
-  --muted-foreground: #5b6b7c;
+  --muted: #edeff2;
+  --muted-foreground: #64686f;
 
-  --accent: #eaf1fa;
-  --accent-foreground: #123a5c;
+  /* Teinte or claire — surfaces mises en valeur / selectionnees */
+  --accent: #f7eed9;
+  --accent-foreground: #7a5a16;
 
   --success: #1f8a4c;
   --success-foreground: #ffffff;
@@ -31,11 +36,17 @@
   --destructive-foreground: #ffffff;
   --destructive-bg: #fbe9e9;
 
-  --border: #dbe3ec;
-  --input: #dbe3ec;
-  --ring: #1d6fae;
+  --border: #dfe2e7;
+  --input: #dfe2e7;
+  --ring: #b8892e;
 
   --radius: 0.6rem;
+
+  /* Sidebar — gris technique fonce MAADEN */
+  --sidebar: #23262b;
+  --sidebar-foreground: #e9eaec;
+  --sidebar-muted-foreground: #9a9ea6;
+  --sidebar-border: #34383f;
 }
 
 @theme inline {
@@ -50,6 +61,7 @@
 
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-bg: var(--secondary-bg);
 
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
@@ -72,6 +84,11 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
+  --color-sidebar-border: var(--sidebar-border);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);

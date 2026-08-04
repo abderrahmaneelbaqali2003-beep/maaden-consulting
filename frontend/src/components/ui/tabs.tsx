@@ -61,8 +61,10 @@ export function TabsTrigger({
       type="button"
       onClick={() => ctx.setValue(value)}
       className={cn(
-        "rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
-        active ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
+        "rounded-sm border-b-2 px-3 py-1.5 text-sm font-medium transition-colors",
+        active
+          ? "border-primary bg-card text-foreground shadow-sm"
+          : "border-transparent text-muted-foreground hover:text-foreground",
         className
       )}
     >

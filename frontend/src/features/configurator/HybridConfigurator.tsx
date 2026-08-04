@@ -107,7 +107,7 @@ export function HybridConfigurator() {
           {(["module", "driver", "lens"] as Slot[]).map((slot) => (
             <label
               key={slot}
-              className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm has-[:checked]:border-secondary has-[:checked]:bg-accent"
+              className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm has-[:checked]:border-primary has-[:checked]:bg-accent"
             >
               <input type="checkbox" checked={imposedSlots.includes(slot)} onChange={() => toggleSlot(slot)} />
               Imposer {SLOT_LABEL[slot]}

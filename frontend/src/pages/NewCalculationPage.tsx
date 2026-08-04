@@ -109,10 +109,10 @@ export default function NewCalculationPage() {
             type="button"
             onClick={() => setMode(value)}
             className={`flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors ${
-              mode === value ? "border-secondary bg-accent" : "border-border bg-card hover:bg-muted"
+              mode === value ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted"
             }`}
           >
-            <Icon className={`h-5 w-5 ${mode === value ? "text-secondary" : "text-muted-foreground"}`} />
+            <Icon className={`h-5 w-5 ${mode === value ? "text-accent-foreground" : "text-muted-foreground"}`} />
             <span className="text-sm font-semibold text-foreground">{title}</span>
             <span className="text-xs text-muted-foreground">{description}</span>
           </button>
