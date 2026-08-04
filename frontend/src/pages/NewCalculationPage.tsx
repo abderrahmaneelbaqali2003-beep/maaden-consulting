@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Sparkles, MousePointerClick, SlidersHorizontal } from "lucide-react";
+import { Loader2, Sparkles, MousePointerClick, SlidersHorizontal, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -108,11 +109,15 @@ export default function NewCalculationPage() {
             key={value}
             type="button"
             onClick={() => setMode(value)}
-            className={`flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors ${
-              mode === value ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted"
-            }`}
+            className={cn(
+              "relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              mode === value ? "border-secondary bg-[#fbf7ed]" : "border-border bg-card hover:bg-muted"
+            )}
           >
-            <Icon className={`h-5 w-5 ${mode === value ? "text-accent-foreground" : "text-muted-foreground"}`} />
+            {mode === value && (
+              <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-secondary" aria-hidden="true" />
+            )}
+            <Icon className={cn("h-5 w-5", mode === value ? "text-accent-foreground" : "text-muted-foreground")} aria-hidden="true" />
             <span className="text-sm font-semibold text-foreground">{title}</span>
             <span className="text-xs text-muted-foreground">{description}</span>
           </button>
@@ -123,7 +128,7 @@ export default function NewCalculationPage() {
       {mode === "hybrid" && <HybridConfigurator />}
 
       {mode === "automatic" && (
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         <Card>
           <CardHeader>
             <CardTitle>Criteres obligatoires</CardTitle>

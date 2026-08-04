@@ -13,7 +13,7 @@ export function InfoTooltip({ text, className }: { text: string; className?: str
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        className="inline-flex text-muted-foreground hover:text-secondary"
+        className="inline-flex text-muted-foreground hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-sm"
         aria-label="Aide"
       >
         <Info className="h-3.5 w-3.5" />

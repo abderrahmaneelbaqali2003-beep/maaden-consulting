@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { History } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { LoadingState } from "@/components/LoadingState";
+import { ErrorState } from "@/components/ErrorState";
+import { EmptyState } from "@/components/EmptyState";
 import { getRecommendationHistory } from "@/api/endpoints";
 import { extractErrorMessage } from "@/api/client";
 import type { RecommendationResponse } from "@/types/api";
@@ -15,8 +19,9 @@ export default function HistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = () => {
     setLoading(true);
+    setError(null);
     getRecommendationHistory(page, 10)
       .then((res) => {
         setItems(res.items);
@@ -24,16 +29,22 @@ export default function HistoryPage() {
       })
       .catch((err) => setError(extractErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [page]);
+  };
+
+  useEffect(load, [page]);
 
   return (
     <div>
       <PageHeader title="Historique" description="Anciens calculs de recommandation et leur validation." />
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Chargement...</p>
-      ) : (
+      {loading && <LoadingState rows={5} />}
+      {!loading && error && <ErrorState message={error} onRetry={load} />}
+
+      {!loading && !error && items.length === 0 && (
+        <EmptyState icon={History} title="Aucun calcul realise pour le moment." />
+      )}
+
+      {!loading && !error && items.length > 0 && (
         <>
           <Table>
             <TableHeader>
@@ -73,20 +84,13 @@ export default function HistoryPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Link to={`/resultats/${run.run_id}`} className="text-sm text-secondary hover:underline">
+                      <Link to={`/resultats/${run.run_id}`} className="text-sm text-accent-foreground hover:underline">
                         Voir
                       </Link>
                     </TableCell>
                   </TableRow>
                 );
               })}
-              {items.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                    Aucun calcul realise pour le moment.
-                  </TableCell>
-                </TableRow>
-              )}
             </TableBody>
           </Table>
 

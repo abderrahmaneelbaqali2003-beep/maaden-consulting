@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { UploadCloud, FileSearch, CheckCircle2, AlertTriangle } from "lucide-react";
+import { UploadCloud, FileSearch, CheckCircle2, AlertTriangle, Check } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { ErrorState } from "@/components/ErrorState";
+import { cn } from "@/lib/utils";
 import { analyzeImportFile, importFile } from "@/api/endpoints";
 import { extractErrorMessage } from "@/api/client";
 import type { AnalyzeResponse, ImportResponse } from "@/types/api";
@@ -17,6 +19,31 @@ const ENTITY_LABELS: Record<EntityKey, string> = {
   modules: "Modules LED",
   lenses: "Lentilles",
 };
+
+const STEPS = ["Selection", "Analyse", "Confirmation", "Resultat"];
+
+function ImportSteps({ step }: { step: number }) {
+  return (
+    <ol className="mb-6 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+      {STEPS.map((label, i) => (
+        <li key={label} className="flex items-center gap-2">
+          <span
+            className={cn(
+              "flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold",
+              i < step && "border-success bg-success-bg text-success",
+              i === step && "border-secondary bg-accent text-accent-foreground",
+              i > step && "border-border text-muted-foreground"
+            )}
+          >
+            {i < step ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : i + 1}
+          </span>
+          <span className={cn(i === step ? "font-medium text-foreground" : "text-muted-foreground")}>{label}</span>
+          {i < STEPS.length - 1 && <span className="mx-1 h-px w-4 bg-border sm:w-8" aria-hidden="true" />}
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 export default function ImportsPage() {
   const [entity, setEntity] = useState<EntityKey>("drivers");
@@ -31,6 +58,8 @@ export default function ImportsPage() {
     setResult(null);
     setError(null);
   };
+
+  const currentStep = result ? 3 : analysis ? 2 : file ? 1 : 0;
 
   const handleAnalyze = async () => {
     if (!file) return;
@@ -48,7 +77,8 @@ export default function ImportsPage() {
   };
 
   const handleConfirmImport = async () => {
-    if (!file) return;
+    if (!file || !analysis) return;
+    if (!window.confirm("Confirmer l'import de ce fichier dans le catalogue ?")) return;
     setBusy(true);
     setError(null);
     try {
@@ -67,6 +97,8 @@ export default function ImportsPage() {
         title="Imports"
         description="Importez de nouvelles references (drivers, modules LED, lentilles) au format Excel (.xlsx, .xls) ou CSV."
       />
+
+      <ImportSteps step={currentStep} />
 
       <Card>
         <CardHeader>
@@ -101,24 +133,24 @@ export default function ImportsPage() {
                 setFile(e.target.files?.[0] ?? null);
                 reset();
               }}
-              className="block w-full text-sm text-foreground file:mr-4 file:rounded-md file:border-0 file:bg-secondary file:px-4 file:py-2 file:text-sm file:font-medium file:text-secondary-foreground"
+              className="block w-full text-sm text-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground"
             />
           </div>
 
           <div className="flex gap-3">
             <Button onClick={handleAnalyze} disabled={!file || busy} variant="outline">
-              <FileSearch className="h-4 w-4" /> Analyser
+              <FileSearch className="h-4 w-4" aria-hidden="true" /> Analyser
             </Button>
-            <Button onClick={handleConfirmImport} disabled={!file || busy}>
-              <UploadCloud className="h-4 w-4" /> Confirmer l'import ({ENTITY_LABELS[entity]})
+            <Button onClick={handleConfirmImport} disabled={!file || busy || !analysis}>
+              <UploadCloud className="h-4 w-4" aria-hidden="true" /> Confirmer l'import ({ENTITY_LABELS[entity]})
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {error && (
-        <div className="mt-4 rounded-md border border-destructive-bg bg-destructive-bg p-3 text-sm text-destructive">
-          {error}
+        <div className="mt-4">
+          <ErrorState message={error} />
         </div>
       )}
 
@@ -159,10 +191,10 @@ export default function ImportsPage() {
             <p className="mb-2 text-sm font-medium">Apercu (10 premieres lignes)</p>
             <div className="overflow-x-auto rounded-md border border-border">
               <table className="w-full text-xs">
-                <thead className="bg-muted">
+                <thead className="bg-[#f1f1ed]">
                   <tr>
                     {analysis.columns.slice(0, 8).map((col) => (
-                      <th key={col.name} className="px-2 py-1.5 text-left font-medium">
+                      <th key={col.name} className="px-2 py-1.5 text-left font-medium text-primary">
                         {col.name}
                       </th>
                     ))}
@@ -191,13 +223,13 @@ export default function ImportsPage() {
         <Card className="mt-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-success" /> 3. Rapport d'import
+              <CheckCircle2 className="h-5 w-5 text-success" aria-hidden="true" /> 3. Rapport d'import
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="mb-4 grid grid-cols-4 gap-4 text-sm">
+            <div className="mb-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
               <div>
-                <p className="text-xl font-semibold">{result.rows_total}</p>
+                <p className="text-xl font-semibold text-foreground">{result.rows_total}</p>
                 <p className="text-muted-foreground">Lignes totales</p>
               </div>
               <div>
@@ -217,7 +249,7 @@ export default function ImportsPage() {
             {result.issues.length > 0 && (
               <div>
                 <p className="mb-1 flex items-center gap-1.5 text-sm font-medium text-warning">
-                  <AlertTriangle className="h-4 w-4" /> Erreurs ligne par ligne
+                  <AlertTriangle className="h-4 w-4" aria-hidden="true" /> Erreurs ligne par ligne
                 </p>
                 <ul className="max-h-64 space-y-1 overflow-y-auto text-sm text-muted-foreground">
                   {result.issues.map((issue, i) => (

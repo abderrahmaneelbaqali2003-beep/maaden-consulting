@@ -155,7 +155,7 @@ export function ProductPicker({
         <div className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
           Aucun resultat.{" "}
           {!showIncompatible && items.length > 0 && (
-            <button type="button" className="text-secondary hover:underline" onClick={() => setShowIncompatible(true)}>
+            <button type="button" className="text-accent-foreground hover:underline" onClick={() => setShowIncompatible(true)}>
               Afficher les {items.length} composant(s) incompatible(s) masque(s).
             </button>
           )}

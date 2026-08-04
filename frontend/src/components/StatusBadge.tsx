@@ -1,11 +1,14 @@
 import { Badge } from "@/components/ui/badge";
 import type { RecommendationStatus } from "@/types/api";
 
-const STATUS_CONFIG: Record<RecommendationStatus, { label: string; variant: "success" | "warning" | "destructive" | "info" | "default" }> = {
+const STATUS_CONFIG: Record<
+  RecommendationStatus,
+  { label: string; variant: "success" | "warning" | "destructive" | "info" | "accent" | "default" }
+> = {
   compatible: { label: "Compatible", variant: "success" },
   compatible_with_warning: { label: "Compatible (avertissement)", variant: "warning" },
   data_incomplete: { label: "Donnees incompletes", variant: "info" },
-  manual_validation_required: { label: "Validation manuelle requise", variant: "warning" },
+  manual_validation_required: { label: "Validation manuelle requise", variant: "accent" },
   not_compatible: { label: "Non compatible", variant: "destructive" },
   impossible: { label: "Impossible", variant: "destructive" },
 };

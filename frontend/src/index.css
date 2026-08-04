@@ -1,52 +1,50 @@
 @import "tailwindcss";
 
 :root {
-  /* MAADEN Consulting — palette derivee du logo (gris technique + or) */
-  --background: #f5f6f7;
-  --foreground: #20232a;
+  --background: #f5f5f2;
+  --foreground: #25292b;
 
   --card: #ffffff;
-  --card-foreground: #20232a;
+  --card-foreground: #25292b;
 
-  /* Or MAADEN — CTA, elements selectionnes / actifs */
-  --primary: #b8892e;
-  --primary-foreground: #211b10;
+  --primary: #4f5557;
+  --primary-foreground: #ffffff;
 
-  /* Bleu-gris sobre — liens et elements informatifs */
-  --secondary: #2e5c82;
+  --secondary: #c99a32;
   --secondary-foreground: #ffffff;
-  --secondary-bg: #eaf1f7;
 
-  --muted: #edeff2;
-  --muted-foreground: #64686f;
+  --accent: #f4ead3;
+  --accent-foreground: #70551c;
 
-  /* Teinte or claire — surfaces mises en valeur / selectionnees */
-  --accent: #f7eed9;
-  --accent-foreground: #7a5a16;
+  --muted: #eeeeea;
+  --muted-foreground: #707779;
 
-  --success: #1f8a4c;
+  --sidebar: #24272b;
+  --sidebar-foreground: #d9dcdd;
+  --sidebar-hover: #303439;
+  --sidebar-active: #38352f;
+
+  --success: #2f7d4a;
   --success-foreground: #ffffff;
-  --success-bg: #e8f6ee;
+  --success-bg: #e7f3eb;
 
-  --warning: #c2680b;
+  --warning: #b56e16;
   --warning-foreground: #ffffff;
-  --warning-bg: #fdf1e2;
+  --warning-bg: #fbf0dd;
 
-  --destructive: #c22b2b;
+  --destructive: #b33a3a;
   --destructive-foreground: #ffffff;
-  --destructive-bg: #fbe9e9;
+  --destructive-bg: #f8e7e7;
 
-  --border: #dfe2e7;
-  --input: #dfe2e7;
-  --ring: #b8892e;
+  --info: #596f7c;
+  --info-foreground: #ffffff;
+  --info-bg: #e9eff2;
 
-  --radius: 0.6rem;
+  --border: #dadbd7;
+  --input: #d5d7d3;
+  --ring: #c99a32;
 
-  /* Sidebar — gris technique fonce MAADEN */
-  --sidebar: #23262b;
-  --sidebar-foreground: #e9eaec;
-  --sidebar-muted-foreground: #9a9ea6;
-  --sidebar-border: #34383f;
+  --radius: 0.65rem;
 }
 
 @theme inline {
@@ -61,7 +59,6 @@
 
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary-bg: var(--secondary-bg);
 
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
@@ -81,14 +78,18 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive-bg: var(--destructive-bg);
 
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-bg: var(--info-bg);
+
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
-  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-active: var(--sidebar-active);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -99,9 +100,22 @@
   border-color: var(--border);
 }
 
+html {
+  background: var(--background);
+}
+
 body {
   margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
   background-color: var(--background);
   color: var(--foreground);
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #f0dfb8;
+  color: #25292b;
 }
