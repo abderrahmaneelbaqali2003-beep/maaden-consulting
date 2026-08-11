@@ -12,6 +12,7 @@ Le système recommande une configuration technique (driver LED + module LED + le
 - [Structure du projet](#structure-du-projet)
 - [Données sources](#données-sources)
 - [Moteur de recommandation](#moteur-de-recommandation)
+- [MAADEN Consulting — Rapport PDF technique](#maaden-consulting--rapport-pdf-technique)
 - [Tests](#tests)
 - [Documentation complémentaire](#documentation-complémentaire)
 - [Limitations connues et extensions futures](#limitations-connues-et-extensions-futures)
@@ -53,6 +54,8 @@ smart-lighting-decision-tool/
 │   │   ├── schemas/            # Schemas Pydantic (validation entree/sortie API)
 │   │   ├── repositories/       # Requetes base de donnees (filtres, pagination)
 │   │   ├── services/           # Import, moteur de compatibilite, scoring, explications
+│   │   ├── calculations/       # Calculateur technique pur (puissance, geometrie, thermique, energie)
+│   │   ├── reports/             # Rapport PDF de consulting (ReportService, PdfGenerator, sections/*)
 │   │   ├── rules/               # Structures de regles et correspondance protocoles
 │   │   └── main.py
 │   ├── migrations/             # Migrations Alembic
@@ -116,6 +119,51 @@ En plus du mode automatique, la page **Nouveau calcul** propose deux autres mode
 - **Semi-automatique** — le consultant impose 1 ou 2 composants ; le système recherche le(s) reste(s) parmi les références compatibles.
 
 Toute la logique de compatibilité est centralisée dans **`ConfigurationValidationService`** (`backend/app/services/configuration_validation_service.py`), réutilisé à l'identique par `recommendation_engine.py` (automatique), `manual_configuration_service.py` (manuel) et `hybrid_configuration_service.py` (semi-automatique) — aucune règle n'est dupliquée entre les trois modes. Endpoints dédiés : `GET /api/configurator/options|modules|drivers|lenses`, `POST /api/configurator/validate|recommend-missing|save`. Les configurations validées peuvent être enregistrées dans `consulting.saved_configurations`.
+
+## MAADEN Consulting — Rapport PDF technique
+
+Une fois une configuration recommandée **validée par un consultant**, MAADEN Consulting genere un rapport PDF de consulting complet, 100% local (aucun appel reseau, aucun LLM, aucune capture d'ecran de page web).
+
+### Principe
+
+```
+Calculateur calcule -> Moteur decide -> Documentation justifie -> Consultant valide -> PDF formalise et archive la decision.
+```
+
+### Validation par configuration
+
+Le moteur peut retourner plusieurs configurations classees (rang 1, 2, 3...). Chacune se valide et se rejette **individuellement**, via son propre `recommendation_result_id` (et non plus systematiquement la meilleure du run) :
+
+- `POST /api/recommendation-results/{result_id}/validate` — body `{"validator_name": "...", "comment": "..."}` (`validator_name` obligatoire).
+- `POST /api/recommendation-results/{result_id}/reject` — meme format.
+
+Une configuration `rejected` ne peut plus jamais produire de rapport valide ; seule une configuration `validated` le peut.
+
+### Generation du rapport
+
+`GET /api/recommendation-results/{result_id}/report.pdf`
+
+- Retourne `409 Conflict` (`"La configuration doit etre validee avant la generation du rapport final."`) si la configuration est `pending` ou `rejected`.
+- Retourne `200` avec `Content-Type: application/pdf` et `Content-Disposition: attachment; filename="MAADEN_Consulting_Report_MC-{annee}-{id}.pdf"` sinon.
+- Genere le PDF **en memoire** (ReportLab), sans fichier temporaire sur disque, a partir des donnees deja persistees (`RecommendationResult`, `Driver`, `LedModule`, `Lens`, `RecommendationEvidence`) et d'un recalcul en direct — mais jamais une re-implementation — de `CalculationService`.
+- Enregistre une trace de tracabilite dans `consulting.generated_reports` (reference, empreinte SHA-256 du contenu, version du gabarit, auteur, date) — le PDF lui-meme n'est jamais stocke sur disque.
+
+### Contenu du rapport (10 sections + page de garde)
+
+Informations projet, configuration retenue (fiches Driver/Module/Lentille completes), score technique (moteur deterministe), calculs techniques (reutilisation stricte de `CalculationService`, formules affichees uniquement quand calculables, estimations de pre-dimensionnement clairement etiquetees), matrice de compatibilite (`validated_rules`/`warnings`/`blocking_reasons`), references documentaires, validations restantes, confiance documentaire, conclusion technique generee par gabarit deterministe (aucun LLM), et validation du consultant (nom, date, commentaire — aucune signature manuscrite generee automatiquement).
+
+### Regles de securite et d'integrite (`backend/app/reports/`)
+
+- **Lecture seule** : `ReportService` ne modifie jamais `overall_score`, ne recalcule jamais la compatibilite, ne change jamais le driver/module/lentille retenu ni le classement, et ne transforme jamais une preuve documentaire en regle bloquante. Verifie par un test de non-regression (`test_report_generation_is_fully_read_only`).
+- **Terminologie documentaire stricte** : un score de classement documentaire (fusion RRF hybride) n'est **jamais** affiche en `%` (ce n'est pas une similarite normalisee) ; une preuve documentaire n'est **jamais** presentee comme une conformite normative acquise ("Conforme IEC 62717") — uniquement "Reference applicable" / "Preuve a verifier" / "Validation documentaire requise".
+- **Donnee manquante** : toujours `"Non renseigne"`, jamais `None`/`null`/un zero invente.
+- **Filtrage** : nom de fichier assaini (`sanitize_filename`), aucun chemin filesystem interne expose, commentaire du consultant echappe avant insertion dans le PDF (`sanitize_pdf_text`).
+- **Limitation photometrique** : toute valeur estimative (`is_estimate=true`) est etiquetee "ESTIMATION" avec la note *"Cette valeur constitue une estimation de pre-dimensionnement et ne remplace pas une simulation photometrique DIALux basee sur un fichier IES/LDT."*
+- **Aucun LLM** : la conclusion technique et les sections documentaires sont produites par des gabarits Python deterministes (`app/reports/report_service.py`), jamais par un modele generatif.
+
+### Frontend
+
+Sur la page **Resultats**, chaque configuration affiche son propre etat : `[ Valider cette configuration ]` (pending, ouvre une modale avec nom du consultant obligatoire + commentaire optionnel) → `✓ CONFIGURATION VALIDEE` + `[ Telecharger le rapport PDF ]` (validated) → `CONFIGURATION REJETEE` sans bouton PDF (rejected).
 
 ## Tests
 

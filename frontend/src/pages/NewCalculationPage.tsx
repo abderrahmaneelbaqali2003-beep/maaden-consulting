@@ -189,6 +189,11 @@ export default function NewCalculationPage() {
         pole_height_m: values.pole_height_m,
         pole_spacing_m: values.pole_spacing_m,
         ambient_temperature_c: values.ambient_temperature_c,
+        road_width_m: values.road_width_m,
+        road_length_m: values.road_length_m,
+        layout_type: values.layout_type || undefined,
+        operating_hours_per_year: values.operating_hours_per_year,
+        energy_price_per_kwh: values.energy_price_per_kwh,
       });
       navigate(`/resultats/${response.run_id}`);
     } catch (err) {

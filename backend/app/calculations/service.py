@@ -56,8 +56,11 @@ class CalculationService:
     ) -> CalculationResult:
         """Configuration retenue par le moteur : utilise les donnees produit reelles."""
         data = CalculationInput(
+            road_width_m=requirement.road_width_m,
+            road_length_m=requirement.road_length_m,
             pole_height_m=requirement.pole_height_m,
             pole_spacing_m=requirement.pole_spacing_m,
+            layout_type=requirement.layout_type,
             required_flux_lm=module.luminous_flux_nominal_lm,
             module_voltage_v=module.input_voltage_nominal_v,
             module_current_ma=module.current_nominal_ma,
@@ -66,6 +69,8 @@ class CalculationService:
             driver_max_temperature_c=driver.ambient_temperature_max_c if driver else None,
             lens_max_temperature_c=lens.operating_temperature_max_c if lens else None,
             ambient_temperature_c=requirement.ambient_temperature_c,
+            operating_hours_per_year=requirement.operating_hours_per_year,
+            energy_price_per_kwh=requirement.energy_price_per_kwh,
         )
         return self._compute(data)
 

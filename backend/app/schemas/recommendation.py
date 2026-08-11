@@ -24,6 +24,13 @@ class RecommendationRequest(BaseModel):
     pole_spacing_m: float | None = Field(None, gt=0)
     ambient_temperature_c: float | None = None
 
+    # --- Calculateur technique (geometrie routiere / implantation / energie) ---
+    road_width_m: float | None = Field(None, gt=0)
+    road_length_m: float | None = Field(None, gt=0)
+    layout_type: str | None = Field(None, description="unilateral, opposite, staggered ou central")
+    operating_hours_per_year: float | None = Field(None, gt=0)
+    energy_price_per_kwh: float | None = Field(None, gt=0)
+
 
 class ComponentRef(BaseModel):
     id: int
@@ -64,6 +71,7 @@ class DocumentaryAnalysisOut(BaseModel):
 
 
 class RecommendationItem(BaseModel):
+    id: int
     rank: int
     overall_score: float
     driver: ComponentRef
@@ -97,6 +105,12 @@ class RecommendationResponse(BaseModel):
     created_at: datetime
 
 
-class ValidationDecision(BaseModel):
-    validator_name: str | None = None
+class ValidateResultRequest(BaseModel):
+    """Body de POST /api/recommendation-results/{result_id}/validate|reject.
+
+    `validator_name` est obligatoire : une configuration validee sans nom de
+    consultant ne doit jamais pouvoir produire un rapport PDF final.
+    """
+
+    validator_name: str = Field(..., min_length=1, description="Nom du consultant qui valide/rejette")
     comment: str | None = None

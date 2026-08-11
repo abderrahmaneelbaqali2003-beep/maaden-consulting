@@ -11,7 +11,7 @@ from app.database.models.compatibility import (
 from app.database.models.project import Project, ProjectRequirement
 from app.database.models.recommendation import RecommendationRun, RecommendationResult, RecommendationEvidence
 from app.database.models.saved_configuration import SavedConfiguration
-from app.database.models.audit import ImportHistory, DataIssue, ExpertValidation, DecisionHistory
+from app.database.models.audit import ImportHistory, DataIssue, ExpertValidation, DecisionHistory, GeneratedReport
 from app.database.models.rag import RagDocument, RagDocumentChunk
 
 __all__ = [
@@ -33,6 +33,7 @@ __all__ = [
     "DataIssue",
     "ExpertValidation",
     "DecisionHistory",
+    "GeneratedReport",
     "RagDocument",
     "RagDocumentChunk",
 ]
