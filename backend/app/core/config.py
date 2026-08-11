@@ -23,6 +23,22 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     environment: str = "development"
 
+    # --- RAG / documentation normative (V2) ---
+    rag_enabled: bool = True
+    embedding_provider: str = "mock"  # "mock" ou "sentence_transformer"
+    embedding_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
+    embedding_dimension: int = 384
+    rag_top_k: int = 5
+    rag_min_score: float = 0.65
+    rag_chunk_size: int = 800
+    rag_chunk_overlap: int = 120
+    max_upload_size_mb: int = 25
+    allowed_document_types: str = "pdf,docx,txt,md,csv,xlsx"
+
+    @property
+    def allowed_document_types_list(self) -> list[str]:
+        return [t.strip() for t in self.allowed_document_types.split(",") if t.strip()]
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

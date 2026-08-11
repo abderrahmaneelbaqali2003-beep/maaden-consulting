@@ -20,7 +20,7 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-SCHEMAS = ["staging", "catalog", "consulting", "audit"]
+SCHEMAS = ["staging", "catalog", "consulting", "audit", "rag"]
 
 
 def run_migrations_offline() -> None:

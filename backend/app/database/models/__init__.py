@@ -9,9 +9,10 @@ from app.database.models.compatibility import (
     ModuleLensCompatibility,
 )
 from app.database.models.project import Project, ProjectRequirement
-from app.database.models.recommendation import RecommendationRun, RecommendationResult
+from app.database.models.recommendation import RecommendationRun, RecommendationResult, RecommendationEvidence
 from app.database.models.saved_configuration import SavedConfiguration
 from app.database.models.audit import ImportHistory, DataIssue, ExpertValidation, DecisionHistory
+from app.database.models.rag import RagDocument, RagDocumentChunk
 
 __all__ = [
     "Manufacturer",
@@ -26,9 +27,12 @@ __all__ = [
     "ProjectRequirement",
     "RecommendationRun",
     "RecommendationResult",
+    "RecommendationEvidence",
     "SavedConfiguration",
     "ImportHistory",
     "DataIssue",
     "ExpertValidation",
     "DecisionHistory",
+    "RagDocument",
+    "RagDocumentChunk",
 ]

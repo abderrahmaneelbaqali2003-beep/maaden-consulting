@@ -6,6 +6,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base, TimestampMixin
 
+# evidence_type: road_lighting / photometric / driver_standard / module_standard /
+#   luminaire_standard / lens_photometry / smart_lighting / safety / performance / measurement
+# verification_status: retrieved / verified / manual_validation_required
+
 
 class RecommendationRun(TimestampMixin, Base):
     """Une execution du moteur de recommandation pour un jeu de besoins donne."""
@@ -57,3 +61,36 @@ class RecommendationResult(TimestampMixin, Base):
 
     validation_status: Mapped[str | None] = mapped_column(String(20))  # pending / validated / rejected
     validated_by: Mapped[str | None] = mapped_column(String(150))
+
+
+class RecommendationEvidence(TimestampMixin, Base):
+    """Preuve documentaire (RAG) reliee a une configuration retenue dans le TOP final.
+
+    Generee uniquement par `EvidenceEnrichmentService`, apres coup, a partir d'une
+    recherche dans `rag.document_chunks`. Ne modifie jamais la compatibilite ni le
+    score technique du `RecommendationResult` associe.
+
+    `document_chunk_id` est nullable : une ligne "sentinelle" (`evidence_type
+    ="missing_evidence"`, `document_chunk_id=None`) sert a persister une
+    validation documentaire manquante (ex: "Simulation DIALux non realisee"),
+    sans avoir a alterer le schema de `recommendation_results` (table V1).
+    """
+
+    __tablename__ = "recommendation_evidence"
+    __table_args__ = {"schema": "consulting"}
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    recommendation_result_id: Mapped[int] = mapped_column(
+        ForeignKey("consulting.recommendation_results.id", ondelete="CASCADE"), nullable=False
+    )
+    document_chunk_id: Mapped[int | None] = mapped_column(
+        ForeignKey("rag.document_chunks.id", ondelete="CASCADE")
+    )
+
+    # road_lighting / photometric / driver_standard / module_standard / luminaire_standard /
+    # lens_photometry / smart_lighting / safety / performance / measurement / missing_evidence
+    evidence_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    claim: Mapped[str] = mapped_column(Text, nullable=False)
+    relevance_score: Mapped[float] = mapped_column(nullable=False)
+    # retrieved / verified / manual_validation_required
+    verification_status: Mapped[str] = mapped_column(String(30), default="retrieved", nullable=False)

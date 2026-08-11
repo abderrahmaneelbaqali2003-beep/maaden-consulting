@@ -11,15 +11,28 @@ et classement (etape G). Le meme service est reutilise par les modes manuel et s
 dupliquee entre les trois modes.
 """
 
+import logging
 import uuid
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
+logger = logging.getLogger(__name__)
+
 from app.core.config import Settings, get_settings
-from app.database.models import Driver, LedModule, Lens, ProjectRequirement, RecommendationResult, RecommendationRun
+from app.database.models import (
+    Driver,
+    LedModule,
+    Lens,
+    ProjectRequirement,
+    RecommendationEvidence,
+    RecommendationResult,
+    RecommendationRun,
+)
 from app.services.candidate_selection import select_candidate_modules
 from app.services.configuration_validation_service import ConfigurationEvaluation, ConfigurationValidationService
+from app.services.evidence_enrichment_service import EvidenceEnrichmentService, build_default_evidence_service
+from app.services.explanation_engine import TemplateExplanationProvider
 
 STATUS_MESSAGES = {
     "compatible": "{n} configuration(s) compatible(s) trouvee(s).",
@@ -43,10 +56,14 @@ class RankedConfiguration:
 
 
 def run_recommendation(
-    db: Session, requirement: ProjectRequirement, settings: Settings | None = None
+    db: Session,
+    requirement: ProjectRequirement,
+    settings: Settings | None = None,
+    evidence_service: EvidenceEnrichmentService | None = None,
 ) -> RecommendationRun:
     settings = settings or get_settings()
     service = ConfigurationValidationService()
+    explanation_provider = TemplateExplanationProvider()
 
     candidate_modules = select_candidate_modules(db, requirement, settings)
     all_drivers = db.query(Driver).filter(Driver.is_active.is_(True)).all()
@@ -112,29 +129,84 @@ def run_recommendation(
     db.add(run)
     db.flush()
 
+    if top and settings.rag_enabled and evidence_service is None:
+        evidence_service = build_default_evidence_service(db, settings)
+
     for rank_number, item in enumerate(top, start=1):
         # Reevaluation finale (avec explication) uniquement pour les configurations retenues.
         final = service.evaluate(item.driver, item.module, item.lens, requirement, settings, rank=rank_number)
-        db.add(
-            RecommendationResult(
-                run_id=run.id,
-                rank=rank_number,
-                driver_id=item.driver.id,
-                module_id=item.module.id,
-                lens_id=item.lens.id if item.lens else None,
-                overall_score=final.scores.overall,
-                score_electrical=final.scores.electrical,
-                score_photometric=final.scores.photometric,
-                score_mechanical=final.scores.mechanical,
-                score_thermal=final.scores.thermal,
-                score_data_quality=final.scores.data_quality,
-                validated_rules=final.validated_rules,
-                warnings=final.warnings,
-                blocking_reasons=final.blocking_reasons,
-                explanation=final.explanation,
-                validation_status="pending",
-            )
+
+        result = RecommendationResult(
+            run_id=run.id,
+            rank=rank_number,
+            driver_id=item.driver.id,
+            module_id=item.module.id,
+            lens_id=item.lens.id if item.lens else None,
+            overall_score=final.scores.overall,
+            score_electrical=final.scores.electrical,
+            score_photometric=final.scores.photometric,
+            score_mechanical=final.scores.mechanical,
+            score_thermal=final.scores.thermal,
+            score_data_quality=final.scores.data_quality,
+            validated_rules=final.validated_rules,
+            warnings=final.warnings,
+            blocking_reasons=final.blocking_reasons,
+            explanation=final.explanation,
+            validation_status="pending",
         )
+        db.add(result)
+
+        # Recherche documentaire : uniquement pour les configurations du TOP final
+        # (jamais sur l'ensemble des combinaisons evaluees en amont). Ne modifie
+        # jamais `final` (compatibilite, regles bloquantes, score technique).
+        # Isolee dans une SAVEPOINT : si la base documentaire est indisponible
+        # (ex: migration RAG pas encore appliquee), le moteur deterministe reste
+        # la seule source de verite et la recommandation V1 continue normalement.
+        if evidence_service is not None:
+            db.flush()  # obtenir result.id pour rattacher les preuves
+            try:
+                with db.begin_nested():
+                    evidence_bundle = evidence_service.enrich(requirement, item.driver, item.module, item.lens, final)
+                    result.explanation = explanation_provider.explain(
+                        rank_number,
+                        item.driver,
+                        item.module,
+                        item.lens,
+                        final.scores,
+                        final.warnings,
+                        evidence=evidence_bundle,
+                    )
+                    for evidence_item in evidence_bundle.all_items():
+                        db.add(
+                            RecommendationEvidence(
+                                recommendation_result_id=result.id,
+                                document_chunk_id=evidence_item.chunk_id,
+                                evidence_type=evidence_item.category,
+                                claim=evidence_item.summary,
+                                relevance_score=evidence_item.relevance_score,
+                                verification_status="retrieved",
+                            )
+                        )
+                    # Lignes "sentinelles" (document_chunk_id=None) : conservent les validations
+                    # documentaires manquantes sans alterer le schema de recommendation_results.
+                    for missing in evidence_bundle.missing_evidence:
+                        db.add(
+                            RecommendationEvidence(
+                                recommendation_result_id=result.id,
+                                document_chunk_id=None,
+                                evidence_type="missing_evidence",
+                                claim=missing,
+                                relevance_score=0.0,
+                                verification_status="manual_validation_required",
+                            )
+                        )
+            except Exception:
+                logger.warning(
+                    "Enrichissement documentaire indisponible (base RAG non initialisee ?) : "
+                    "recommandation V1 poursuivie sans preuves documentaires.",
+                    exc_info=True,
+                )
+                evidence_service = None  # evite de repeter l'echec pour les autres configurations du TOP
 
     db.commit()
     db.refresh(run)

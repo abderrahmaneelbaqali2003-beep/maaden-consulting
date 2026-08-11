@@ -113,6 +113,122 @@ export interface ScoresOut {
   data_quality: number;
 }
 
+// --- V2 : synthese documentaire (RAG) ---
+
+export type DocumentaryConfidence = "high" | "medium" | "low" | "insufficient_evidence";
+
+export interface EvidenceOut {
+  category: string;
+  document: string;
+  section: string | null;
+  page: number | null;
+  relevance_score: number;
+  summary: string;
+}
+
+export interface DocumentaryAnalysisOut {
+  confidence: DocumentaryConfidence;
+  evidence_count: number;
+  evidence: EvidenceOut[];
+  missing_evidence: string[];
+}
+
+// --- Calculateur technique ---
+
+export type CalculationStatus = "calculated" | "estimate" | "not_calculable" | "to_validate";
+
+export interface CalculationValue {
+  key: string;
+  label: string;
+  value: number | null;
+  unit: string | null;
+  status: CalculationStatus;
+  formula: string | null;
+  inputs: Record<string, string | number | null>;
+  is_estimate: boolean;
+  warning: string | null;
+}
+
+export interface DimmingProfileEntry {
+  duration_hours: number;
+  level_percent: number;
+}
+
+export type LayoutType = "unilateral" | "opposite" | "staggered" | "central";
+
+export interface CalculationInput {
+  road_width_m?: number | null;
+  road_length_m?: number | null;
+  pole_height_m?: number | null;
+  pole_spacing_m?: number | null;
+  layout_type?: LayoutType | null;
+
+  required_flux_lm?: number | null;
+  utilization_factor?: number | null;
+  maintenance_factor?: number | null;
+  illuminance_min_lux?: number | null;
+  illuminance_avg_lux?: number | null;
+
+  module_voltage_v?: number | null;
+  module_current_ma?: number | null;
+  module_power_nominal_w?: number | null;
+
+  driver_power_max_w?: number | null;
+  driver_max_temperature_c?: number | null;
+  lens_max_temperature_c?: number | null;
+
+  ambient_temperature_c?: number | null;
+
+  operating_hours_per_year?: number | null;
+  energy_price_per_kwh?: number | null;
+  reference_energy_kwh?: number | null;
+  dimming_profile?: DimmingProfileEntry[] | null;
+}
+
+export interface ElectricalCalculationResult {
+  module_power_w: CalculationValue;
+  module_power_consistency_percent: CalculationValue;
+  driver_required_power_w: CalculationValue;
+  driver_loading_percent: CalculationValue;
+  driver_power_margin_percent: CalculationValue;
+  luminous_efficacy_lm_w: CalculationValue;
+}
+
+export interface GeometryCalculationResult {
+  spacing_height_ratio: CalculationValue;
+  road_segment_area_m2: CalculationValue;
+  estimated_luminaire_count: CalculationValue;
+}
+
+export interface ThermalCalculationResult {
+  driver_thermal_margin_c: CalculationValue;
+  lens_thermal_margin_c: CalculationValue;
+  tightest_thermal_margin_c: CalculationValue;
+}
+
+export interface EnergyCalculationResult {
+  total_installed_power_kw: CalculationValue;
+  annual_energy_kwh: CalculationValue;
+  annual_energy_with_dimming_kwh: CalculationValue;
+  energy_saving_percent: CalculationValue;
+  energy_saved_kwh_year: CalculationValue;
+  annual_energy_cost: CalculationValue;
+}
+
+export interface PhotometricEstimateResult {
+  estimated_average_illuminance_lux: CalculationValue;
+  uniformity_u0: CalculationValue;
+}
+
+export interface CalculationResult {
+  electrical: ElectricalCalculationResult;
+  geometry: GeometryCalculationResult;
+  thermal: ThermalCalculationResult;
+  energy: EnergyCalculationResult;
+  photometric: PhotometricEstimateResult;
+  warnings: string[];
+}
+
 export interface RecommendationItem {
   rank: number;
   overall_score: number;
@@ -125,6 +241,8 @@ export interface RecommendationItem {
   blocking_reasons: string[];
   explanation: string;
   validation_status: string | null;
+  documentary_analysis?: DocumentaryAnalysisOut | null;
+  technical_calculations?: CalculationResult | null;
 }
 
 export interface RejectedSummary {

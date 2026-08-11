@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { CheckCircle2, XCircle, AlertTriangle, ArrowLeft, ArrowRight, ArrowDown } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  ArrowDown,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldQuestion,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RecommendedBadge } from "@/components/RecommendedBadge";
@@ -8,10 +20,126 @@ import { LoadingState } from "@/components/LoadingState";
 import { ErrorState } from "@/components/ErrorState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { TechnicalCalculationsSection } from "@/features/configurator/TechnicalCalculationsSection";
 import { cn } from "@/lib/utils";
 import { getRecommendation, validateRecommendation, rejectRecommendation } from "@/api/endpoints";
 import { extractErrorMessage } from "@/api/client";
-import type { ComponentRef, RecommendationItem, RecommendationResponse } from "@/types/api";
+import type {
+  ComponentRef,
+  DocumentaryAnalysisOut,
+  DocumentaryConfidence,
+  EvidenceOut,
+  RecommendationItem,
+  RecommendationResponse,
+} from "@/types/api";
+
+const CONFIDENCE_CONFIG: Record<
+  DocumentaryConfidence,
+  { label: string; variant: "success" | "warning" | "info" | "default"; icon: typeof ShieldCheck }
+> = {
+  high: { label: "Elevee", variant: "success", icon: ShieldCheck },
+  medium: { label: "Moyenne", variant: "warning", icon: ShieldQuestion },
+  low: { label: "Faible", variant: "info", icon: ShieldAlert },
+  insufficient_evidence: { label: "Preuve insuffisante", variant: "default", icon: ShieldAlert },
+};
+
+const EVIDENCE_CATEGORY_LABELS: Record<string, string> = {
+  road_lighting: "Eclairage routier",
+  photometric: "Performance photometrique",
+  driver_standard: "Securite driver LED",
+  module_standard: "Performance / securite module LED",
+  luminaire_standard: "Securite du luminaire",
+  lens_photometry: "Photometrie de la lentille",
+  smart_lighting: "Commande numerique (DALI / D4i)",
+  safety: "Securite",
+  performance: "Performance",
+  measurement: "Mesure",
+};
+
+function EvidenceRow({ item }: { item: EvidenceOut }) {
+  const [open, setOpen] = useState(false);
+  const relevancePercent = Math.round(Math.min(1, Math.max(0, item.relevance_score)) * 100);
+
+  return (
+    <li className="rounded-md border border-border p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium text-foreground">{item.document}</p>
+          <p className="text-xs text-muted-foreground">
+            {item.section ? `Section : ${item.section}` : "Section non identifiee"}
+            {item.page ? ` — Page ${item.page}` : ""}
+          </p>
+        </div>
+        <span className="shrink-0 text-xs font-medium text-accent-foreground">Pertinence : {relevancePercent}%</span>
+      </div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="mt-2 flex items-center gap-1 text-xs font-medium text-accent-foreground hover:underline"
+      >
+        {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />}
+        {open ? "Masquer le passage" : "Afficher le passage"}
+      </button>
+      {open && <p className="mt-2 text-sm text-muted-foreground">{item.summary}</p>}
+    </li>
+  );
+}
+
+function DocumentaryAnalysisSection({ analysis }: { analysis: DocumentaryAnalysisOut }) {
+  const confidenceConfig = CONFIDENCE_CONFIG[analysis.confidence] ?? CONFIDENCE_CONFIG.insufficient_evidence;
+  const ConfidenceIcon = confidenceConfig.icon;
+  const uniqueByCategory = Array.from(new Map(analysis.evidence.map((e) => [e.category, e])).values());
+
+  return (
+    <div className="space-y-4 border-t border-border pt-4">
+      {uniqueByCategory.length > 0 && (
+        <div>
+          <p className="mb-2 text-sm font-semibold text-foreground">References normatives</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {uniqueByCategory.map((item) => (
+              <div key={item.category} className="rounded-md bg-muted px-3 py-2 text-sm">
+                <p className="font-medium text-foreground">{EVIDENCE_CATEGORY_LABELS[item.category] ?? item.category}</p>
+                <p className="text-xs text-muted-foreground">{item.document}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {analysis.evidence.length > 0 && (
+        <div>
+          <p className="mb-2 text-sm font-semibold text-foreground">Justification documentaire</p>
+          <ul className="space-y-2">
+            {analysis.evidence.map((item, i) => (
+              <EvidenceRow key={i} item={item} />
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {analysis.missing_evidence.length > 0 && (
+        <div>
+          <p className="mb-2 text-sm font-semibold text-foreground">Validations restantes</p>
+          <ul className="space-y-1">
+            {analysis.missing_evidence.map((m, i) => (
+              <li key={i} className="flex items-center gap-1.5 text-sm text-warning">
+                <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" /> {m}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div>
+        <p className="mb-2 text-sm font-semibold text-foreground">Confiance documentaire</p>
+        <Badge variant={confidenceConfig.variant}>
+          <ConfidenceIcon className="h-3.5 w-3.5" aria-hidden="true" /> {confidenceConfig.label.toUpperCase()}
+        </Badge>
+      </div>
+    </div>
+  );
+}
 
 function ScoreBar({ label, value, max }: { label: string; value: number; max: number }) {
   const percent = Math.max(0, Math.min(100, (value / max) * 100));
@@ -98,6 +226,10 @@ function ConfigurationCard({ item, isBest }: { item: RecommendationItem; isBest:
           <ScoreBar label="Qualite des donnees" value={item.scores.data_quality} max={10} />
         </div>
 
+        {item.technical_calculations && (
+          <TechnicalCalculationsSection calculations={item.technical_calculations} />
+        )}
+
         <p className="text-sm text-foreground">{item.explanation}</p>
 
         {item.validated_rules.length > 0 && (
@@ -138,6 +270,8 @@ function ConfigurationCard({ item, isBest }: { item: RecommendationItem; isBest:
             </ul>
           </div>
         )}
+
+        {item.documentary_analysis && <DocumentaryAnalysisSection analysis={item.documentary_analysis} />}
       </CardContent>
     </Card>
   );

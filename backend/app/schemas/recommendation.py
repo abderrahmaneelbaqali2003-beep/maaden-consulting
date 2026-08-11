@@ -3,6 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.calculations.models import CalculationResult
+
 
 class RecommendationRequest(BaseModel):
     """Formulaire 'Nouveau calcul' (section 11). Les 5 premiers champs sont obligatoires."""
@@ -37,6 +39,30 @@ class ScoresOut(BaseModel):
     data_quality: float
 
 
+class EvidenceOut(BaseModel):
+    """Une preuve documentaire retrouvee pour une configuration retenue (V2 - RAG)."""
+
+    category: str
+    document: str
+    section: str | None
+    page: int | None
+    relevance_score: float
+    summary: str
+
+
+class DocumentaryAnalysisOut(BaseModel):
+    """Synthese documentaire d'une configuration (V2). Ne modifie jamais `overall_score`.
+
+    `confidence` reste distincte de la compatibilite technique : une confiance
+    documentaire basse ne signifie jamais qu'une configuration est incompatible.
+    """
+
+    confidence: str  # high / medium / low / insufficient_evidence
+    evidence_count: int
+    evidence: list[EvidenceOut]
+    missing_evidence: list[str]
+
+
 class RecommendationItem(BaseModel):
     rank: int
     overall_score: float
@@ -49,6 +75,8 @@ class RecommendationItem(BaseModel):
     blocking_reasons: list[str]
     explanation: str
     validation_status: str | None = None
+    documentary_analysis: DocumentaryAnalysisOut | None = None
+    technical_calculations: CalculationResult | None = None
 
 
 class RejectedSummary(BaseModel):

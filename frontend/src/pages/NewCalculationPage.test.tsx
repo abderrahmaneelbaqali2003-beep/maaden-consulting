@@ -3,8 +3,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import NewCalculationPage from "./NewCalculationPage";
-import { createRecommendation } from "@/api/endpoints";
+import { createRecommendation, previewCalculations } from "@/api/endpoints";
 import { getConfiguratorOptions, listConfiguratorModules } from "@/api/configurator";
+import type { CalculationResult, CalculationValue } from "@/types/api";
 
 const navigateMock = vi.fn();
 
@@ -15,9 +16,60 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("@/api/endpoints", () => ({
   createRecommendation: vi.fn(),
+  previewCalculations: vi.fn(),
   listDrivers: vi.fn(),
   listLenses: vi.fn(),
 }));
+
+function calcValue(
+  overrides: Partial<CalculationValue> & Pick<CalculationValue, "key" | "label" | "status">
+): CalculationValue {
+  return { value: null, unit: null, formula: null, inputs: {}, is_estimate: false, warning: null, ...overrides };
+}
+
+function buildCalculationResult(modulePowerW: number | null = 33.6): CalculationResult {
+  const modulePowerStatus = modulePowerW === null ? "not_calculable" : "calculated";
+  return {
+    electrical: {
+      module_power_w: calcValue({
+        key: "module_power_w",
+        label: "Puissance module",
+        status: modulePowerStatus,
+        value: modulePowerW,
+        unit: "W",
+        warning: modulePowerW === null ? "Tension et/ou courant du module manquant(s)." : null,
+      }),
+      module_power_consistency_percent: calcValue({ key: "module_power_consistency_percent", label: "Ecart puissance", status: "not_calculable" }),
+      driver_required_power_w: calcValue({ key: "driver_required_power_w", label: "Puissance driver requise", status: "not_calculable" }),
+      driver_loading_percent: calcValue({ key: "driver_loading_percent", label: "Charge driver", status: "not_calculable" }),
+      driver_power_margin_percent: calcValue({ key: "driver_power_margin_percent", label: "Marge driver", status: "not_calculable" }),
+      luminous_efficacy_lm_w: calcValue({ key: "luminous_efficacy_lm_w", label: "Efficacite lumineuse", status: "not_calculable" }),
+    },
+    geometry: {
+      spacing_height_ratio: calcValue({ key: "spacing_height_ratio", label: "Ratio S/H", status: "not_calculable" }),
+      road_segment_area_m2: calcValue({ key: "road_segment_area_m2", label: "Surface routiere elementaire", status: "not_calculable" }),
+      estimated_luminaire_count: calcValue({ key: "estimated_luminaire_count", label: "Nombre estimatif de luminaires", status: "not_calculable" }),
+    },
+    thermal: {
+      driver_thermal_margin_c: calcValue({ key: "driver_thermal_margin_c", label: "Marge thermique driver", status: "not_calculable" }),
+      lens_thermal_margin_c: calcValue({ key: "lens_thermal_margin_c", label: "Marge thermique lentille", status: "not_calculable" }),
+      tightest_thermal_margin_c: calcValue({ key: "tightest_thermal_margin_c", label: "Marge thermique la plus contraignante", status: "not_calculable" }),
+    },
+    energy: {
+      total_installed_power_kw: calcValue({ key: "total_installed_power_kw", label: "Puissance totale installee", status: "not_calculable" }),
+      annual_energy_kwh: calcValue({ key: "annual_energy_kwh", label: "Consommation annuelle", status: "not_calculable" }),
+      annual_energy_with_dimming_kwh: calcValue({ key: "annual_energy_with_dimming_kwh", label: "Consommation avec gradation", status: "not_calculable" }),
+      energy_saving_percent: calcValue({ key: "energy_saving_percent", label: "Economie energetique", status: "not_calculable" }),
+      energy_saved_kwh_year: calcValue({ key: "energy_saved_kwh_year", label: "Energie economisee", status: "not_calculable" }),
+      annual_energy_cost: calcValue({ key: "annual_energy_cost", label: "Cout energetique annuel", status: "not_calculable" }),
+    },
+    photometric: {
+      estimated_average_illuminance_lux: calcValue({ key: "estimated_average_illuminance_lux", label: "Eclairement moyen estimatif", status: "not_calculable" }),
+      uniformity_u0: calcValue({ key: "uniformity_u0", label: "Uniformite U0", status: "not_calculable" }),
+    },
+    warnings: [],
+  };
+}
 
 vi.mock("@/api/configurator", () => ({
   getConfiguratorOptions: vi.fn(),
@@ -41,6 +93,7 @@ describe("NewCalculationPage", () => {
   beforeEach(() => {
     navigateMock.mockReset();
     vi.mocked(createRecommendation).mockReset();
+    vi.mocked(previewCalculations).mockReset();
     vi.mocked(getConfiguratorOptions).mockReset();
     vi.mocked(getConfiguratorOptions).mockResolvedValue({
       selection_modes: [],
@@ -67,7 +120,7 @@ describe("NewCalculationPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole("button", { name: /Lancer la recommandation/i }));
+    await user.click(screen.getByRole("button", { name: /Rechercher les configurations compatibles/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Le flux lumineux est obligatoire.")).toBeInTheDocument();
@@ -97,7 +150,7 @@ describe("NewCalculationPage", () => {
     await user.type(screen.getByPlaceholderText("Ex: en V"), "48");
     await user.type(screen.getByPlaceholderText("Ex: en mA"), "1050");
 
-    await user.click(screen.getByRole("button", { name: /Lancer la recommandation/i }));
+    await user.click(screen.getByRole("button", { name: /Rechercher les configurations compatibles/i }));
 
     await waitFor(() => {
       expect(createRecommendation).toHaveBeenCalledWith(
@@ -117,11 +170,11 @@ describe("NewCalculationPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    expect(screen.getByRole("button", { name: /Lancer la recommandation$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Rechercher les configurations compatibles$/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Selection manuelle assistee/i }));
 
-    expect(screen.queryByRole("button", { name: /Lancer la recommandation$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Rechercher les configurations compatibles$/i })).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("1. Module LED")).toBeInTheDocument());
   });
 
@@ -132,5 +185,34 @@ describe("NewCalculationPage", () => {
     await user.click(screen.getByRole("button", { name: /Selection semi-automatique/i }));
 
     await waitFor(() => expect(screen.getByText("Composant(s) impose(s)")).toBeInTheDocument());
+  });
+
+  it("calcule les grandeurs techniques au clic sur Calculer et affiche le resultat", async () => {
+    vi.mocked(previewCalculations).mockResolvedValue(buildCalculationResult(33.6));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByPlaceholderText("Ex: en V"), "48");
+    await user.type(screen.getByPlaceholderText("Ex: en mA"), "700");
+
+    await user.click(screen.getByRole("button", { name: /^Calculer$/i }));
+
+    await waitFor(() => expect(previewCalculations).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText("33,6 W")).toBeInTheDocument());
+    // Le bouton de recommandation n'est jamais verrouille par le calcul.
+    expect(screen.getByRole("button", { name: /Rechercher les configurations compatibles/i })).toBeEnabled();
+  });
+
+  it("affiche une grandeur non calculable sans planter quand une donnee manque", async () => {
+    vi.mocked(previewCalculations).mockResolvedValue(buildCalculationResult(null));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: /^Calculer$/i }));
+
+    await waitFor(() => expect(previewCalculations).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText("Puissance module")).toBeInTheDocument());
+    // Jamais un 0 W invente : le KPI affiche un tiret pour une donnee manquante.
+    expect(screen.queryByText("0 W")).not.toBeInTheDocument();
   });
 });
