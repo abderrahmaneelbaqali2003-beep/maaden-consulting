@@ -97,6 +97,11 @@ export interface RecommendationRequest {
   pole_height_m?: number | null;
   pole_spacing_m?: number | null;
   ambient_temperature_c?: number | null;
+  road_width_m?: number | null;
+  road_length_m?: number | null;
+  layout_type?: string | null;
+  operating_hours_per_year?: number | null;
+  energy_price_per_kwh?: number | null;
 }
 
 export interface ComponentRef {
@@ -229,7 +234,15 @@ export interface CalculationResult {
   warnings: string[];
 }
 
+export type ValidationStatus = "pending" | "validated" | "rejected";
+
+export interface ValidateResultRequest {
+  validator_name: string;
+  comment?: string | null;
+}
+
 export interface RecommendationItem {
+  id: number;
   rank: number;
   overall_score: number;
   driver: ComponentRef;
@@ -240,7 +253,7 @@ export interface RecommendationItem {
   warnings: string[];
   blocking_reasons: string[];
   explanation: string;
-  validation_status: string | null;
+  validation_status: ValidationStatus | null;
   documentary_analysis?: DocumentaryAnalysisOut | null;
   technical_calculations?: CalculationResult | null;
 }

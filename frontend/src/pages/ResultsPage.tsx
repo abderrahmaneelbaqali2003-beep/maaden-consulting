@@ -12,6 +12,8 @@ import {
   ShieldQuestion,
   ChevronDown,
   ChevronUp,
+  FileDown,
+  Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -21,10 +23,18 @@ import { ErrorState } from "@/components/ErrorState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog } from "@/components/ui/dialog";
 import { TechnicalCalculationsSection } from "@/features/configurator/TechnicalCalculationsSection";
 import { cn } from "@/lib/utils";
-import { getRecommendation, validateRecommendation, rejectRecommendation } from "@/api/endpoints";
-import { extractErrorMessage } from "@/api/client";
+import {
+  getRecommendation,
+  validateRecommendationResult,
+  rejectRecommendationResult,
+  downloadRecommendationReport,
+} from "@/api/endpoints";
+import { extractErrorMessage, extractBlobErrorMessage } from "@/api/client";
 import type {
   ComponentRef,
   DocumentaryAnalysisOut,
@@ -191,10 +201,220 @@ function FlowArrow() {
   );
 }
 
-function ConfigurationCard({ item, isBest }: { item: RecommendationItem; isBest: boolean }) {
+type ValidationModalMode = "validate" | "reject";
+
+function ValidationModal({
+  mode,
+  open,
+  onClose,
+  onConfirm,
+}: {
+  mode: ValidationModalMode;
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (validatorName: string, comment: string) => Promise<void>;
+}) {
+  const [validatorName, setValidatorName] = useState("");
+  const [comment, setComment] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setValidatorName("");
+      setComment("");
+      setError(null);
+      setSubmitting(false);
+    }
+  }, [open]);
+
+  const handleConfirm = async () => {
+    if (!validatorName.trim()) {
+      setError("Le nom du consultant est obligatoire.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onConfirm(validatorName.trim(), comment.trim());
+    } catch (err) {
+      setError(extractErrorMessage(err));
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={mode === "validate" ? "Valider cette configuration" : "Rejeter cette configuration"}
+    >
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="validator_name">Nom du consultant *</Label>
+          <Input
+            id="validator_name"
+            value={validatorName}
+            onChange={(e) => setValidatorName(e.target.value)}
+            placeholder="Ex: Jean Dupont"
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <Label htmlFor="validation_comment">Commentaire</Label>
+          <textarea
+            id="validation_comment"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={3}
+            className="mt-1 flex w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground placeholder:text-[#9a9fa1] transition-colors focus-visible:border-secondary focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(201,154,50,0.15)]"
+            placeholder="Optionnel"
+          />
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" onClick={onClose} disabled={submitting}>
+            Annuler
+          </Button>
+          <Button
+            variant={mode === "validate" ? "default" : "destructive"}
+            onClick={handleConfirm}
+            disabled={submitting}
+          >
+            {submitting ? "Envoi..." : mode === "validate" ? "Valider la configuration" : "Rejeter la configuration"}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+function ConfigurationValidationFooter({
+  item,
+  selected,
+  onSelect,
+  onDeselect,
+  onChanged,
+}: {
+  item: RecommendationItem;
+  selected: boolean;
+  onSelect: () => void;
+  onDeselect: () => void;
+  onChanged: () => void;
+}) {
+  const [modalMode, setModalMode] = useState<ValidationModalMode | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const handleConfirm = async (validatorName: string, comment: string) => {
+    if (modalMode === "validate") {
+      await validateRecommendationResult(item.id, { validator_name: validatorName, comment: comment || null });
+    } else {
+      await rejectRecommendationResult(item.id, { validator_name: validatorName, comment: comment || null });
+    }
+    setModalMode(null);
+    onChanged();
+  };
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      await downloadRecommendationReport(item.id);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("Echec du telechargement du rapport PDF (result_id=" + item.id + "):", err);
+      const message = await extractBlobErrorMessage(err, "Impossible de telecharger le rapport PDF.");
+      setDownloadError(message);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-border pt-4">
+      {item.validation_status === "validated" && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge variant="success">
+            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> CONFIGURATION VALIDEE
+          </Badge>
+          <Button variant="outline" size="sm" onClick={handleDownload} disabled={downloading}>
+            {downloading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Generation...
+              </>
+            ) : (
+              <>
+                <FileDown className="h-4 w-4" aria-hidden="true" /> Telecharger le rapport PDF
+              </>
+            )}
+          </Button>
+          {downloadError && <span className="text-sm text-destructive">{downloadError}</span>}
+        </div>
+      )}
+
+      {item.validation_status === "rejected" && (
+        <Badge variant="destructive">
+          <XCircle className="h-3.5 w-3.5" aria-hidden="true" /> CONFIGURATION REJETEE
+        </Badge>
+      )}
+
+      {(item.validation_status === "pending" || item.validation_status === null) && !selected && (
+        <Button variant="outline" size="sm" onClick={onSelect}>
+          <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Choisir cette configuration
+        </Button>
+      )}
+
+      {(item.validation_status === "pending" || item.validation_status === null) && selected && (
+        <div className="space-y-2">
+          <Badge variant="accent">
+            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> CONFIGURATION CHOISIE
+          </Badge>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="default" size="sm" onClick={() => setModalMode("validate")}>
+              <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Valider cette configuration
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setModalMode("reject")}>
+              <XCircle className="h-4 w-4" aria-hidden="true" /> Rejeter
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onDeselect}>
+              Changer de choix
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <ValidationModal
+        mode={modalMode ?? "validate"}
+        open={modalMode !== null}
+        onClose={() => setModalMode(null)}
+        onConfirm={handleConfirm}
+      />
+    </div>
+  );
+}
+
+function ConfigurationCard({
+  item,
+  isBest,
+  selected,
+  onSelect,
+  onDeselect,
+  onChanged,
+}: {
+  item: RecommendationItem;
+  isBest: boolean;
+  selected: boolean;
+  onSelect: () => void;
+  onDeselect: () => void;
+  onChanged: () => void;
+}) {
   return (
     <Card
-      className={cn(isBest && "border-secondary shadow-[0_6px_18px_rgba(201,154,50,0.10)]")}
+      className={cn(
+        isBest && "border-secondary shadow-[0_6px_18px_rgba(201,154,50,0.10)]",
+        selected && "border-accent-foreground shadow-[0_6px_18px_rgba(112,85,28,0.12)]"
+      )}
     >
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Configuration n°{item.rank}</CardTitle>
@@ -272,6 +492,14 @@ function ConfigurationCard({ item, isBest }: { item: RecommendationItem; isBest:
         )}
 
         {item.documentary_analysis && <DocumentaryAnalysisSection analysis={item.documentary_analysis} />}
+
+        <ConfigurationValidationFooter
+          item={item}
+          selected={selected}
+          onSelect={onSelect}
+          onDeselect={onDeselect}
+          onChanged={onChanged}
+        />
       </CardContent>
     </Card>
   );
@@ -283,8 +511,7 @@ export default function ResultsPage() {
   const [data, setData] = useState<RecommendationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
 
   const load = () => {
     if (!runId) return;
@@ -297,32 +524,6 @@ export default function ResultsPage() {
   };
 
   useEffect(load, [runId]);
-
-  const handleValidate = async () => {
-    if (!runId) return;
-    if (!window.confirm("Confirmer la validation de la meilleure configuration ?")) return;
-    setActionError(null);
-    try {
-      await validateRecommendation(Number(runId));
-      setActionMessage("Configuration validee.");
-      load();
-    } catch (err) {
-      setActionError(extractErrorMessage(err));
-    }
-  };
-
-  const handleReject = async () => {
-    if (!runId) return;
-    if (!window.confirm("Confirmer le rejet de cette recommandation ?")) return;
-    setActionError(null);
-    try {
-      await rejectRecommendation(Number(runId));
-      setActionMessage("Configuration rejetee.");
-      load();
-    } catch (err) {
-      setActionError(extractErrorMessage(err));
-    }
-  };
 
   if (loading) return <LoadingState rows={5} />;
   if (error) return <ErrorState message={error} onRetry={load} />;
@@ -346,14 +547,7 @@ export default function ResultsPage() {
             Comparer les {data.recommendations.length} configurations
           </Link>
         )}
-        {actionMessage && <span className="text-sm text-success">{actionMessage}</span>}
       </div>
-
-      {actionError && (
-        <div className="mb-6">
-          <ErrorState title="Action impossible" message={actionError} />
-        </div>
-      )}
 
       {data.blocking_reasons.length > 0 && (
         <Card className="mb-6 border-destructive-bg">
@@ -382,20 +576,17 @@ export default function ResultsPage() {
 
       <div className="space-y-6">
         {data.recommendations.map((item) => (
-          <ConfigurationCard key={item.rank} item={item} isBest={item.rank === 1} />
+          <ConfigurationCard
+            key={item.id}
+            item={item}
+            isBest={item.rank === 1}
+            selected={selectedResultId === item.id}
+            onSelect={() => setSelectedResultId(item.id)}
+            onDeselect={() => setSelectedResultId(null)}
+            onChanged={load}
+          />
         ))}
       </div>
-
-      {data.recommendations.length > 0 && (
-        <div className="mt-6 flex gap-3">
-          <Button variant="default" onClick={handleValidate}>
-            <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Valider la meilleure configuration
-          </Button>
-          <Button variant="destructive" onClick={handleReject}>
-            <XCircle className="h-4 w-4" aria-hidden="true" /> Rejeter
-          </Button>
-        </div>
-      )}
 
       <Card className="mt-6">
         <CardHeader>

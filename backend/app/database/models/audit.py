@@ -74,3 +74,28 @@ class DecisionHistory(TimestampMixin, Base):
     action: Mapped[str] = mapped_column(String(30), nullable=False)  # created / validated / rejected / exported
     actor: Mapped[str | None] = mapped_column(String(150))
     details: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class GeneratedReport(TimestampMixin, Base):
+    """Trace de chaque rapport PDF genere (reproductibilite/audit).
+
+    `snapshot` fige les donnees ayant servi a la generation (scores, regles, preuves) au
+    moment T, pour pouvoir retracer un rapport meme si le produit ou la documentation
+    source changent ensuite. Le PDF lui-meme n'est jamais stocke sur disque (genere a la
+    demande) : seule cette trace de metadonnees est persistee.
+    """
+
+    __tablename__ = "generated_reports"
+    __table_args__ = {"schema": "consulting"}
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    recommendation_result_id: Mapped[int] = mapped_column(
+        ForeignKey("consulting.recommendation_results.id", ondelete="CASCADE"), nullable=False
+    )
+    report_reference: Mapped[str] = mapped_column(String(50), nullable=False)
+    report_type: Mapped[str] = mapped_column(String(30), default="technical_recommendation", nullable=False)
+    generated_by: Mapped[str | None] = mapped_column(String(150))
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    version: Mapped[str] = mapped_column(String(10), nullable=False)
+    snapshot: Mapped[dict | None] = mapped_column(JSON)

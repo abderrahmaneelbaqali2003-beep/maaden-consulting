@@ -39,3 +39,13 @@ class ProjectRequirement(TimestampMixin, Base):
     pole_height_m: Mapped[float | None] = mapped_column()
     pole_spacing_m: Mapped[float | None] = mapped_column()
     ambient_temperature_c: Mapped[float | None] = mapped_column()
+
+    # --- Calculateur technique (geometrie routiere / implantation / energie) ---
+    # Persistes depuis le formulaire "Nouveau calcul" (jusque-la utilises uniquement par
+    # POST /api/calculations/preview, jamais enregistres) afin que le rapport PDF de
+    # consulting puisse reconstruire l'etude complete depuis la base.
+    road_width_m: Mapped[float | None] = mapped_column()
+    road_length_m: Mapped[float | None] = mapped_column()
+    layout_type: Mapped[str | None] = mapped_column(String(20))  # unilateral / opposite / staggered / central
+    operating_hours_per_year: Mapped[float | None] = mapped_column()
+    energy_price_per_kwh: Mapped[float | None] = mapped_column()

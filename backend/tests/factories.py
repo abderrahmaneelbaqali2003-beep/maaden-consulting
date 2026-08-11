@@ -1,6 +1,14 @@
 """Fabriques de donnees de test pour le moteur de recommandation."""
 
-from app.database.models import Driver, LedModule, Lens, Manufacturer, ProjectRequirement
+from app.database.models import (
+    Driver,
+    LedModule,
+    Lens,
+    Manufacturer,
+    ProjectRequirement,
+    RecommendationResult,
+    RecommendationRun,
+)
 
 _counter = {"n": 0}
 
@@ -104,3 +112,38 @@ def make_requirement(db=None, persist: bool = False, **overrides) -> ProjectRequ
         db.add(requirement)
         db.flush()
     return requirement
+
+
+def make_run(db, requirement: ProjectRequirement, **overrides) -> RecommendationRun:
+    defaults = dict(requirement_id=requirement.id, status="compatible", message="ok")
+    defaults.update(overrides)
+    run = RecommendationRun(**defaults)
+    db.add(run)
+    db.flush()
+    return run
+
+
+def make_result(db, run: RecommendationRun, driver: Driver | None, module: LedModule, lens: Lens | None, **overrides) -> RecommendationResult:
+    defaults = dict(
+        run_id=run.id,
+        rank=1,
+        driver_id=driver.id if driver else None,
+        module_id=module.id,
+        lens_id=lens.id if lens else None,
+        overall_score=85.5,
+        score_electrical=32.0,
+        score_photometric=22.0,
+        score_mechanical=18.0,
+        score_thermal=8.5,
+        score_data_quality=5.0,
+        validated_rules=["Tension compatible avec la plage du driver."],
+        warnings=[],
+        blocking_reasons=[],
+        explanation="Configuration compatible.",
+        validation_status="pending",
+    )
+    defaults.update(overrides)
+    result = RecommendationResult(**defaults)
+    db.add(result)
+    db.flush()
+    return result

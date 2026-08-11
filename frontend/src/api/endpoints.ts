@@ -13,6 +13,7 @@ import type {
   PaginatedResponse,
   RecommendationRequest,
   RecommendationResponse,
+  ValidateResultRequest,
 } from "@/types/api";
 
 // --- Sante ---
@@ -59,10 +60,34 @@ export const getRecommendationHistory = (page = 1, page_size = 10) =>
       params: { page, page_size },
     })
     .then((r) => r.data);
-export const validateRecommendation = (id: number, validator_name?: string, comment?: string) =>
-  apiClient.post(`/api/recommendations/${id}/validate`, { validator_name, comment });
-export const rejectRecommendation = (id: number, validator_name?: string, comment?: string) =>
-  apiClient.post(`/api/recommendations/${id}/reject`, { validator_name, comment });
+export const validateRecommendationResult = (resultId: number, payload: ValidateResultRequest) =>
+  apiClient.post(`/api/recommendation-results/${resultId}/validate`, payload).then((r) => r.data);
+export const rejectRecommendationResult = (resultId: number, payload: ValidateResultRequest) =>
+  apiClient.post(`/api/recommendation-results/${resultId}/reject`, payload).then((r) => r.data);
+
+// --- Rapport PDF de consulting ---
+
+function extractFilename(contentDisposition: string | undefined, fallback: string): string {
+  const match = contentDisposition?.match(/filename="?([^";]+)"?/);
+  return match ? match[1] : fallback;
+}
+
+/** Telecharge le rapport PDF d'une configuration validee et declenche le telechargement
+ * navigateur. Ne fonctionne que si `validation_status === "validated"` (409 sinon). */
+export const downloadRecommendationReport = async (resultId: number) => {
+  const response = await apiClient.get(`/api/recommendation-results/${resultId}/report.pdf`, {
+    responseType: "blob",
+  });
+  const filename = extractFilename(response.headers["content-disposition"], `MAADEN_Consulting_Report_${resultId}.pdf`);
+  const blobUrl = URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(blobUrl);
+};
 
 // --- Calculateur technique ---
 export const previewCalculations = (payload: CalculationInput) =>

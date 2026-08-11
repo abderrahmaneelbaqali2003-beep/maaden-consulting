@@ -11,7 +11,6 @@ from app.core.config import get_settings
 from app.database.models import (
     DecisionHistory,
     Driver,
-    ExpertValidation,
     LedModule,
     Lens,
     ProjectRequirement,
@@ -31,7 +30,6 @@ from app.schemas.recommendation import (
     RecommendationResponse,
     RejectedSummary,
     ScoresOut,
-    ValidationDecision,
 )
 from app.services.evidence_enrichment_service import compute_confidence
 from app.services.recommendation_engine import run_recommendation
@@ -141,6 +139,7 @@ def _build_response(run: RecommendationRun, db: Session) -> RecommendationRespon
         lens = db.get(Lens, result.lens_id) if result.lens_id else None
         items.append(
             RecommendationItem(
+                id=result.id,
                 rank=result.rank,
                 overall_score=result.overall_score,
                 driver=_component_ref(driver),
@@ -204,6 +203,11 @@ def create_recommendation(payload: RecommendationRequest, db: Session = Depends(
         pole_height_m=payload.pole_height_m,
         pole_spacing_m=payload.pole_spacing_m,
         ambient_temperature_c=payload.ambient_temperature_c,
+        road_width_m=payload.road_width_m,
+        road_length_m=payload.road_length_m,
+        layout_type=payload.layout_type,
+        operating_hours_per_year=payload.operating_hours_per_year,
+        energy_price_per_kwh=payload.energy_price_per_kwh,
     )
     db.add(requirement)
     db.flush()
@@ -235,61 +239,3 @@ def get_recommendation(run_id: int, db: Session = Depends(get_db)):
     if run is None:
         raise HTTPException(status_code=404, detail="Execution de recommandation introuvable.")
     return _build_response(run, db)
-
-
-@router.post("/{run_id}/validate", status_code=200)
-def validate_recommendation(run_id: int, payload: ValidationDecision, db: Session = Depends(get_db)):
-    run = db.get(RecommendationRun, run_id)
-    if run is None:
-        raise HTTPException(status_code=404, detail="Execution de recommandation introuvable.")
-    top_result = (
-        db.query(RecommendationResult)
-        .filter(RecommendationResult.run_id == run_id)
-        .order_by(RecommendationResult.rank)
-        .first()
-    )
-    if top_result is None:
-        raise HTTPException(status_code=404, detail="Aucune configuration a valider pour cette execution.")
-
-    top_result.validation_status = "validated"
-    top_result.validated_by = payload.validator_name
-    db.add(
-        ExpertValidation(
-            recommendation_result_id=top_result.id,
-            validator_name=payload.validator_name,
-            decision="validated",
-            comment=payload.comment,
-        )
-    )
-    db.add(DecisionHistory(recommendation_run_id=run_id, action="validated", actor=payload.validator_name, details={}))
-    db.commit()
-    return {"status": "validated", "recommendation_result_id": top_result.id}
-
-
-@router.post("/{run_id}/reject", status_code=200)
-def reject_recommendation(run_id: int, payload: ValidationDecision, db: Session = Depends(get_db)):
-    run = db.get(RecommendationRun, run_id)
-    if run is None:
-        raise HTTPException(status_code=404, detail="Execution de recommandation introuvable.")
-    top_result = (
-        db.query(RecommendationResult)
-        .filter(RecommendationResult.run_id == run_id)
-        .order_by(RecommendationResult.rank)
-        .first()
-    )
-    if top_result is None:
-        raise HTTPException(status_code=404, detail="Aucune configuration a rejeter pour cette execution.")
-
-    top_result.validation_status = "rejected"
-    top_result.validated_by = payload.validator_name
-    db.add(
-        ExpertValidation(
-            recommendation_result_id=top_result.id,
-            validator_name=payload.validator_name,
-            decision="rejected",
-            comment=payload.comment,
-        )
-    )
-    db.add(DecisionHistory(recommendation_run_id=run_id, action="rejected", actor=payload.validator_name, details={}))
-    db.commit()
-    return {"status": "rejected", "recommendation_result_id": top_result.id}
