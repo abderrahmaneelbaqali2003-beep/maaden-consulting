@@ -1,7 +1,12 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db
+from app.calculations.models import CalculationResult
+from app.calculations.service import CalculationService
 from app.core.config import get_settings
 from app.database.models import (
     DecisionHistory,
@@ -10,12 +15,17 @@ from app.database.models import (
     LedModule,
     Lens,
     ProjectRequirement,
+    RagDocument,
+    RagDocumentChunk,
+    RecommendationEvidence,
     RecommendationResult,
     RecommendationRun,
 )
 from app.schemas.common import PaginatedResponse
 from app.schemas.recommendation import (
     ComponentRef,
+    DocumentaryAnalysisOut,
+    EvidenceOut,
     RecommendationItem,
     RecommendationRequest,
     RecommendationResponse,
@@ -23,17 +33,106 @@ from app.schemas.recommendation import (
     ScoresOut,
     ValidationDecision,
 )
+from app.services.evidence_enrichment_service import compute_confidence
 from app.services.recommendation_engine import run_recommendation
 
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
+logger = logging.getLogger(__name__)
 
 
 def _component_ref(entity) -> ComponentRef:
     return ComponentRef(id=entity.id, manufacturer=entity.manufacturer.name, reference=entity.reference)
 
 
+def _documentary_analysis(result: RecommendationResult, db: Session) -> DocumentaryAnalysisOut | None:
+    """Reconstruit la synthese documentaire depuis `recommendation_evidence` (rien n'est
+    persiste sur `recommendation_results` : la table V1 reste inchangee).
+
+    Renvoie `None` si la base documentaire n'est pas disponible (ex: migration RAG
+    pas encore appliquee) au lieu de faire echouer toute la lecture de la
+    recommandation : le moteur deterministe (compatibilite, score) reste
+    lisible dans tous les cas.
+    """
+    try:
+        rows = (
+            db.query(RecommendationEvidence, RagDocumentChunk, RagDocument)
+            .outerjoin(RagDocumentChunk, RecommendationEvidence.document_chunk_id == RagDocumentChunk.id)
+            .outerjoin(RagDocument, RagDocumentChunk.document_id == RagDocument.id)
+            .filter(RecommendationEvidence.recommendation_result_id == result.id)
+            .order_by(RecommendationEvidence.relevance_score.desc())
+            .all()
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        logger.warning(
+            "Lecture de la synthese documentaire indisponible (base RAG non initialisee ?) "
+            "pour recommendation_result_id=%s.",
+            result.id,
+            exc_info=True,
+        )
+        return None
+
+    if not rows:
+        return None
+
+    evidence: list[EvidenceOut] = []
+    missing_evidence: list[str] = []
+    for rec_evidence, chunk, document in rows:
+        if rec_evidence.evidence_type == "missing_evidence" or document is None:
+            missing_evidence.append(rec_evidence.claim)
+            continue
+        evidence.append(
+            EvidenceOut(
+                category=rec_evidence.evidence_type,
+                document=document.title,
+                section=chunk.section_title if chunk else None,
+                page=chunk.page_number if chunk else None,
+                relevance_score=rec_evidence.relevance_score,
+                summary=rec_evidence.claim,
+            )
+        )
+
+    categories = {item.category for item in evidence}
+    confidence = (
+        compute_confidence(
+            has_product="module_standard" in categories or "driver_standard" in categories,
+            has_photometric_or_road="road_lighting" in categories or "photometric" in categories,
+            has_normative="luminaire_standard" in categories or "smart_lighting" in categories,
+            missing_count=len(missing_evidence),
+        )
+        if evidence
+        else "insufficient_evidence"
+    )
+
+    return DocumentaryAnalysisOut(
+        confidence=confidence,
+        evidence_count=len(evidence),
+        evidence=evidence,
+        missing_evidence=missing_evidence,
+    )
+
+
+def _technical_calculations(
+    requirement: ProjectRequirement | None, driver: Driver | None, module: LedModule, lens: Lens | None
+) -> CalculationResult | None:
+    """Grandeurs techniques (puissance, charge/marge driver, efficacite, geometrie,
+    marge thermique) pour la configuration retenue. Calcul pur, sans effet de bord :
+    n'affecte jamais `overall_score` ni la compatibilite. Protege par un try/except
+    par coherence avec `_documentary_analysis` (aucune donnee externe ici, mais une
+    configuration produit incomplete/inattendue ne doit jamais faire echouer la
+    lecture de la recommandation)."""
+    if requirement is None:
+        return None
+    try:
+        return CalculationService().for_configuration(requirement, driver, module, lens)
+    except Exception:
+        logger.warning("Calcul technique indisponible pour la configuration.", exc_info=True)
+        return None
+
+
 def _build_response(run: RecommendationRun, db: Session) -> RecommendationResponse:
     results = _fetch_results_with_relations(db, run.id)
+    requirement = db.get(ProjectRequirement, run.requirement_id)
 
     items = []
     for result in results:
@@ -59,6 +158,8 @@ def _build_response(run: RecommendationRun, db: Session) -> RecommendationRespon
                 blocking_reasons=result.blocking_reasons,
                 explanation=result.explanation,
                 validation_status=result.validation_status,
+                documentary_analysis=_documentary_analysis(result, db),
+                technical_calculations=_technical_calculations(requirement, driver, module, lens),
             )
         )
 

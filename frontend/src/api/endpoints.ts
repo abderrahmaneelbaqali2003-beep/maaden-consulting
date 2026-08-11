@@ -1,6 +1,8 @@
 import { apiClient } from "@/api/client";
 import type {
   AnalyzeResponse,
+  CalculationInput,
+  CalculationResult,
   DashboardSummary,
   DataIssueEntry,
   Driver,
@@ -61,6 +63,10 @@ export const validateRecommendation = (id: number, validator_name?: string, comm
   apiClient.post(`/api/recommendations/${id}/validate`, { validator_name, comment });
 export const rejectRecommendation = (id: number, validator_name?: string, comment?: string) =>
   apiClient.post(`/api/recommendations/${id}/reject`, { validator_name, comment });
+
+// --- Calculateur technique ---
+export const previewCalculations = (payload: CalculationInput) =>
+  apiClient.post<CalculationResult>("/api/calculations/preview", payload).then((r) => r.data);
 
 // --- Imports ---
 export const analyzeImportFile = (file: File) => {

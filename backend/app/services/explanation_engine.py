@@ -3,12 +3,25 @@
 `ExplanationProvider` est une interface abstraite : la V1 utilise uniquement
 `TemplateExplanationProvider` (aucun LLM). Une future `LLMExplanationProvider` pourra
 etre branchee sans modifier le moteur de compatibilite, qui reste 100% deterministe.
+
+V2 (RAG) : `explain()` accepte un `evidence` optionnel (`EvidenceBundle`, voir
+`app.services.evidence_enrichment_service`) pour enrichir le texte d'un rappel du
+cadre normatif associe et des validations documentaires restantes. Les appels
+existants (sans `evidence`) restent inchanges — argument optionnel par defaut `None`.
+
+Formulations volontairement prudentes : un passage documentaire retrouve ne
+prouve jamais a lui seul la conformite reglementaire ("norme associee",
+"reference documentaire pertinente", "a verifier"), jamais "conforme IEC X".
 """
 
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from app.database.models import Driver, LedModule, Lens
 from app.services.scoring_engine import ScoreBreakdown
+
+if TYPE_CHECKING:
+    from app.services.evidence_enrichment_service import EvidenceBundle
 
 
 class ExplanationProvider(ABC):
@@ -21,6 +34,7 @@ class ExplanationProvider(ABC):
         lens: Lens | None,
         scores: ScoreBreakdown,
         warnings: list[str],
+        evidence: "EvidenceBundle | None" = None,
     ) -> str: ...
 
 
@@ -33,6 +47,7 @@ class TemplateExplanationProvider(ExplanationProvider):
         lens: Lens | None,
         scores: ScoreBreakdown,
         warnings: list[str],
+        evidence: "EvidenceBundle | None" = None,
     ) -> str:
         parts = [f"Configuration classee n°{rank} avec un score global de {scores.overall}/100."]
 
@@ -65,4 +80,32 @@ class TemplateExplanationProvider(ExplanationProvider):
         if warnings:
             parts.append("Points a verifier avant validation finale : " + " ".join(warnings))
 
-        return " ".join(parts)
+        if evidence is not None:
+            parts.append(self._evidence_paragraph(evidence))
+
+        return " ".join(p for p in parts if p)
+
+    @staticmethod
+    def _evidence_paragraph(evidence: "EvidenceBundle") -> str:
+        items = evidence.all_items()
+        if not items:
+            return (
+                "Aucune reference documentaire pertinente n'a ete retrouvee dans la base normative pour cette "
+                "configuration (confiance documentaire : preuve insuffisante)."
+            )
+
+        seen_documents = []
+        for item in items:
+            label = f"{item.document_title}" + (f" ({item.section_title})" if item.section_title else "")
+            if label not in seen_documents:
+                seen_documents.append(label)
+
+        segments = [
+            "Cadre normatif associe (reference documentaire pertinente, a verifier avec la source officielle) : "
+            + "; ".join(seen_documents[:5])
+            + "."
+        ]
+        if evidence.missing_evidence:
+            segments.append("Validations documentaires manquantes : " + "; ".join(evidence.missing_evidence) + ".")
+        segments.append(f"Confiance documentaire : {evidence.confidence}.")
+        return " ".join(segments)

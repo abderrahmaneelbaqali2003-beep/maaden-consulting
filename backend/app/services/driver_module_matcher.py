@@ -5,6 +5,7 @@ avertissement (jamais une invention de valeur) et n'empeche pas la suite du calc
 sauf les regles explicitement bloquantes dont les donnees sont presentes.
 """
 
+from app.calculations.electrical import calculate_power_margin_percent
 from app.core.config import Settings
 from app.database.models import Driver, LedModule, ProjectRequirement
 from app.rules.protocol_matching import resolve_protocol_column
@@ -71,7 +72,7 @@ def evaluate_driver_for_module(
     if module.power_nominal_w is not None:
         required_power = module.power_nominal_w * settings.safety_factor
         if driver.output_power_max_w >= required_power:
-            margin_percent = (driver.output_power_max_w / module.power_nominal_w - 1) * 100
+            margin_percent = calculate_power_margin_percent(driver.output_power_max_w, module.power_nominal_w)
             status = "valid" if margin_percent >= (settings.safety_factor - 1) * 100 + 5 else "warning"
             detail = f"Marge de {margin_percent:.0f}% (minimum requis : {(settings.safety_factor - 1) * 100:.0f}%)."
             evaluation.validated_rules.append(

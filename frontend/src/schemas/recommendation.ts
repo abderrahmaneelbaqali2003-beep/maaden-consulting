@@ -23,6 +23,16 @@ export const recommendationFormSchema = z.object({
   pole_height_m: z.number().positive("La hauteur doit etre positive.").optional(),
   pole_spacing_m: z.number().positive("L'espacement doit etre positif.").optional(),
   ambient_temperature_c: z.number().optional(),
+
+  // Champs additionnels du calculateur technique (jamais envoyes a createRecommendation()) :
+  // alimentent uniquement l'apercu POST /api/calculations/preview.
+  road_width_m: z.number().positive("La largeur doit etre positive.").optional(),
+  road_length_m: z.number().positive("La longueur doit etre positive.").optional(),
+  // z.string() (et non z.enum(...)) : le <select> renvoie "" par defaut, que z.enum().optional()
+  // rejette (seuls undefined ou une valeur de l'enum sont acceptes) — meme choix que `protocol` ci-dessus.
+  layout_type: z.string().optional(),
+  operating_hours_per_year: z.number().positive("Les heures doivent etre positives.").optional(),
+  energy_price_per_kwh: z.number().positive("Le tarif doit etre positif.").optional(),
 });
 
 export type RecommendationFormValues = z.infer<typeof recommendationFormSchema>;

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import configurator, dashboard, drivers, imports, lenses, modules, recommendations
+from app.api.routes import calculations, configurator, dashboard, drivers, imports, lenses, modules, rag, recommendations
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 
@@ -29,6 +29,8 @@ app.include_router(recommendations.router)
 app.include_router(imports.router)
 app.include_router(dashboard.router)
 app.include_router(configurator.router)
+app.include_router(rag.router)
+app.include_router(calculations.router)
 
 
 @app.get("/api/health", tags=["health"])

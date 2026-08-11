@@ -2,7 +2,15 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Sparkles, MousePointerClick, SlidersHorizontal, CheckCircle2 } from "lucide-react";
+import {
+  Loader2,
+  Sparkles,
+  MousePointerClick,
+  SlidersHorizontal,
+  CheckCircle2,
+  Check,
+  Calculator,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -13,10 +21,11 @@ import { Button } from "@/components/ui/button";
 import { InfoTooltip } from "@/components/ui/tooltip";
 import { ManualConfigurator } from "@/features/configurator/ManualConfigurator";
 import { HybridConfigurator } from "@/features/configurator/HybridConfigurator";
+import { CalculationPreview } from "@/features/configurator/CalculationPreview";
 import { recommendationFormSchema, setValueAsNumber, type RecommendationFormValues } from "@/schemas/recommendation";
-import { createRecommendation } from "@/api/endpoints";
+import { createRecommendation, previewCalculations } from "@/api/endpoints";
 import { extractErrorMessage } from "@/api/client";
-import type { SelectionMode } from "@/types/api";
+import type { CalculationInput, CalculationResult, SelectionMode } from "@/types/api";
 
 const MODE_CARDS: { value: SelectionMode; title: string; description: string; icon: typeof Sparkles }[] = [
   {
@@ -39,6 +48,33 @@ const MODE_CARDS: { value: SelectionMode; title: string; description: string; ic
   },
 ];
 
+const WORKFLOW_STEPS = ["Donnees projet", "Calculs", "Recommandation", "Justification", "Validation"];
+
+function WorkflowSteps({ currentStep }: { currentStep: number }) {
+  return (
+    <ol className="mb-6 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+      {WORKFLOW_STEPS.map((label, i) => (
+        <li key={label} className="flex items-center gap-2">
+          <span
+            className={cn(
+              "flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold",
+              i < currentStep && "border-success bg-success-bg text-success",
+              i === currentStep && "border-secondary bg-accent text-accent-foreground",
+              i > currentStep && "border-border text-muted-foreground"
+            )}
+          >
+            {i < currentStep ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : i + 1}
+          </span>
+          <span className={cn(i === currentStep ? "font-medium text-foreground" : "text-muted-foreground")}>
+            {label}
+          </span>
+          {i < WORKFLOW_STEPS.length - 1 && <span className="mx-1 h-px w-4 bg-border sm:w-8" aria-hidden="true" />}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 interface FieldConfig {
   name: keyof RecommendationFormValues;
   label: string;
@@ -47,32 +83,96 @@ interface FieldConfig {
   required?: boolean;
 }
 
-const REQUIRED_FIELDS: FieldConfig[] = [
+const LIGHTING_FIELDS: FieldConfig[] = [
   { name: "required_flux_lm", label: "Flux lumineux demande", unit: "lm", required: true, help: "Quantite de lumiere totale attendue du luminaire, en lumens." },
-  { name: "max_power_w", label: "Puissance totale maximale", unit: "W", required: true, help: "Puissance electrique maximale autorisee pour l'ensemble driver + module." },
   { name: "required_cct_k", label: "Temperature de couleur (CCT)", unit: "K", required: true, help: "Teinte de la lumiere blanche souhaitee (ex: 3000 K = blanc chaud, 4000 K = blanc neutre)." },
+  { name: "max_power_w", label: "Puissance totale maximale", unit: "W", required: true, help: "Puissance electrique maximale autorisee pour l'ensemble driver + module." },
+];
+
+const ELECTRICAL_FIELDS: FieldConfig[] = [
   { name: "voltage_nominal_v", label: "Tension nominale du module", unit: "V", required: true, help: "Tension de fonctionnement attendue du module LED." },
   { name: "current_nominal_ma", label: "Courant nominal", unit: "mA", required: true, help: "Courant electrique attendu, en milliamperes." },
 ];
 
-const OPTIONAL_NUMERIC_FIELDS: FieldConfig[] = [
-  { name: "pole_height_m", label: "Hauteur du candelabre", unit: "m", help: "Hauteur de mât du candélabre (optionnel, utile pour l'analyse photometrique future)." },
+const GEOMETRY_FIELDS: FieldConfig[] = [
+  { name: "pole_height_m", label: "Hauteur du candelabre", unit: "m", help: "Hauteur de mât du candélabre (optionnel)." },
   { name: "pole_spacing_m", label: "Espacement entre candelabres", unit: "m", help: "Distance entre deux mâts consecutifs (optionnel)." },
-  { name: "ambient_temperature_c", label: "Temperature ambiante", unit: "°C", help: "Temperature ambiante maximale attendue sur site (optionnel, verifie la tenue thermique des composants)." },
+  { name: "road_width_m", label: "Largeur de chaussee", unit: "m", help: "Largeur de la chaussee eclairee (optionnel, utilise par le calculateur)." },
+  { name: "road_length_m", label: "Longueur de route", unit: "m", help: "Longueur totale du troncon a eclairer (optionnel, utilise par le calculateur)." },
 ];
+
+const ENERGY_FIELDS: FieldConfig[] = [
+  { name: "operating_hours_per_year", label: "Heures de fonctionnement annuelles", unit: "h/an", help: "Duree de fonctionnement estimee sur une annee (optionnel)." },
+  { name: "energy_price_per_kwh", label: "Tarif energetique", unit: "/kWh", help: "Prix du kWh (optionnel) — jamais suppose par le systeme." },
+];
+
+function NumberField({ field, errors, register }: { field: FieldConfig; errors: Record<string, unknown>; register: ReturnType<typeof useForm<RecommendationFormValues>>["register"] }) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={field.name} className="flex items-center gap-1.5">
+        {field.label} {field.required && <span className="text-destructive">*</span>}
+        <InfoTooltip text={field.help} />
+        <span className="ml-auto text-xs font-normal text-muted-foreground">{field.unit}</span>
+      </Label>
+      <Input
+        id={field.name}
+        type="number"
+        step="any"
+        min={0}
+        placeholder={`Ex: en ${field.unit}`}
+        {...register(field.name, { setValueAs: setValueAsNumber })}
+      />
+      {Boolean(errors[field.name]) && (
+        <p className="text-xs text-destructive">{(errors[field.name] as { message?: string })?.message}</p>
+      )}
+    </div>
+  );
+}
 
 export default function NewCalculationPage() {
   const navigate = useNavigate();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [mode, setMode] = useState<SelectionMode>("automatic");
 
+  const [calcResult, setCalcResult] = useState<CalculationResult | null>(null);
+  const [calcLoading, setCalcLoading] = useState(false);
+  const [calcError, setCalcError] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<RecommendationFormValues>({
     resolver: zodResolver(recommendationFormSchema),
   });
+
+  const handleCalculate = async () => {
+    setCalcLoading(true);
+    setCalcError(null);
+    try {
+      const values = getValues();
+      const input: CalculationInput = {
+        road_width_m: values.road_width_m,
+        road_length_m: values.road_length_m,
+        pole_height_m: values.pole_height_m,
+        pole_spacing_m: values.pole_spacing_m,
+        layout_type: (values.layout_type || undefined) as CalculationInput["layout_type"],
+        required_flux_lm: values.required_flux_lm,
+        module_voltage_v: values.voltage_nominal_v,
+        module_current_ma: values.current_nominal_ma,
+        ambient_temperature_c: values.ambient_temperature_c,
+        operating_hours_per_year: values.operating_hours_per_year,
+        energy_price_per_kwh: values.energy_price_per_kwh,
+      };
+      const result = await previewCalculations(input);
+      setCalcResult(result);
+    } catch (err) {
+      setCalcError(extractErrorMessage(err));
+    } finally {
+      setCalcLoading(false);
+    }
+  };
 
   const onSubmit = async (values: RecommendationFormValues) => {
     setSubmitError(null);
@@ -103,6 +203,8 @@ export default function NewCalculationPage() {
         description="Saisissez les besoins du projet pour obtenir une recommandation de driver, module et lentille."
       />
 
+      {mode === "automatic" && <WorkflowSteps currentStep={calcResult ? 1 : 0} />}
+
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {MODE_CARDS.map(({ value, title, description, icon: Icon }) => (
           <button
@@ -131,41 +233,32 @@ export default function NewCalculationPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         <Card>
           <CardHeader>
-            <CardTitle>Criteres obligatoires</CardTitle>
-            <CardDescription>Ces cinq champs sont necessaires pour lancer un calcul.</CardDescription>
+            <CardTitle>Eclairage</CardTitle>
+            <CardDescription>Ces criteres sont necessaires pour lancer un calcul.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-5 pt-0 sm:grid-cols-2">
-            {REQUIRED_FIELDS.map((field) => (
-              <div key={field.name} className="space-y-1.5">
-                <Label htmlFor={field.name} className="flex items-center gap-1.5">
-                  {field.label} <span className="text-destructive">*</span>
-                  <InfoTooltip text={field.help} />
-                  <span className="ml-auto text-xs font-normal text-muted-foreground">{field.unit}</span>
-                </Label>
-                <Input
-                  id={field.name}
-                  type="number"
-                  step="any"
-                  min={0}
-                  placeholder={`Ex: en ${field.unit}`}
-                  {...register(field.name, { setValueAs: setValueAsNumber })}
-                />
-                {errors[field.name] && (
-                  <p className="text-xs text-destructive">{errors[field.name]?.message as string}</p>
-                )}
-              </div>
+            {LIGHTING_FIELDS.map((field) => (
+              <NumberField key={field.name} field={field} errors={errors} register={register} />
             ))}
+            <div className="space-y-1.5">
+              <Label htmlFor="led_package" className="flex items-center gap-1.5">
+                Package LED
+                <InfoTooltip text="Format physique des LED du module (ex: 3535, 5050, COB)." />
+              </Label>
+              <Input id="led_package" placeholder="Ex: 3535" {...register("led_package")} />
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Criteres optionnels</CardTitle>
-            <CardDescription>
-              Affinent la recommandation. Laissez vide si inconnu — le systeme ne devine jamais une valeur.
-            </CardDescription>
+            <CardTitle>Electrique</CardTitle>
+            <CardDescription>Tension, courant et protocole de pilotage du driver.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-5 pt-0 sm:grid-cols-2">
+            {ELECTRICAL_FIELDS.map((field) => (
+              <NumberField key={field.name} field={field} errors={errors} register={register} />
+            ))}
             <div className="space-y-1.5">
               <Label htmlFor="protocol" className="flex items-center gap-1.5">
                 Protocole demande
@@ -180,15 +273,17 @@ export default function NewCalculationPage() {
                 <option value="1-10V">1-10V</option>
               </Select>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="led_package" className="flex items-center gap-1.5">
-                Package LED
-                <InfoTooltip text="Format physique des LED du module (ex: 3535, 5050, COB)." />
-              </Label>
-              <Input id="led_package" placeholder="Ex: 3535" {...register("led_package")} />
-            </div>
-
+        <Card>
+          <CardHeader>
+            <CardTitle>Geometrie routiere</CardTitle>
+            <CardDescription>
+              Affinent la recommandation et alimentent le calculateur technique. Laissez vide si inconnu.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-5 pt-0 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="road_type" className="flex items-center gap-1.5">
                 Type de voie
@@ -196,22 +291,60 @@ export default function NewCalculationPage() {
               </Label>
               <Input id="road_type" placeholder="Ex: route urbaine" {...register("road_type")} />
             </div>
-
-            {OPTIONAL_NUMERIC_FIELDS.map((field) => (
-              <div key={field.name} className="space-y-1.5">
-                <Label htmlFor={field.name} className="flex items-center gap-1.5">
-                  {field.label}
-                  <InfoTooltip text={field.help} />
-                  <span className="ml-auto text-xs font-normal text-muted-foreground">{field.unit}</span>
-                </Label>
-                <Input id={field.name} type="number" step="any" min={0} {...register(field.name, { setValueAs: setValueAsNumber })} />
-                {errors[field.name] && (
-                  <p className="text-xs text-destructive">{errors[field.name]?.message as string}</p>
-                )}
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="layout_type" className="flex items-center gap-1.5">
+                Type d&apos;implantation
+                <InfoTooltip text="Disposition des candelabres le long de la voie." />
+              </Label>
+              <Select id="layout_type" {...register("layout_type")}>
+                <option value="">Non precise</option>
+                <option value="unilateral">Unilaterale</option>
+                <option value="opposite">Vis-a-vis</option>
+                <option value="staggered">Quinconce</option>
+                <option value="central">Mat central</option>
+              </Select>
+            </div>
+            {GEOMETRY_FIELDS.map((field) => (
+              <NumberField key={field.name} field={field} errors={errors} register={register} />
             ))}
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Environnement</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-5 pt-0 sm:grid-cols-2">
+            <NumberField
+              field={{ name: "ambient_temperature_c", label: "Temperature ambiante", unit: "°C", help: "Temperature ambiante maximale attendue sur site (optionnel, verifie la tenue thermique des composants)." }}
+              errors={errors}
+              register={register}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Energie</CardTitle>
+            <CardDescription>Facultatif — utilise uniquement par le calculateur technique, jamais suppose.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-5 pt-0 sm:grid-cols-2">
+            {ENERGY_FIELDS.map((field) => (
+              <NumberField key={field.name} field={field} errors={errors} register={register} />
+            ))}
+          </CardContent>
+        </Card>
+
+        <div>
+          <Button type="button" variant="outline" onClick={handleCalculate} disabled={calcLoading}>
+            {calcLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" aria-hidden="true" />}
+            Calculer
+          </Button>
+        </div>
+
+        {(calcResult || calcLoading || calcError) && (
+          <CalculationPreview result={calcResult} loading={calcLoading} error={calcError} />
+        )}
 
         {submitError && (
           <div className="rounded-md border border-destructive-bg bg-destructive-bg p-3 text-sm text-destructive">
@@ -221,7 +354,7 @@ export default function NewCalculationPage() {
 
         <Button type="submit" size="lg" disabled={isSubmitting}>
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          Lancer la recommandation
+          Rechercher les configurations compatibles
         </Button>
       </form>
       )}
