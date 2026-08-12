@@ -7,6 +7,10 @@ import ComparisonPage from "@/pages/ComparisonPage";
 import CatalogPage from "@/pages/CatalogPage";
 import ImportsPage from "@/pages/ImportsPage";
 import HistoryPage from "@/pages/HistoryPage";
+import ProjectsPage from "@/pages/ProjectsPage";
+import ProjectDetailPage from "@/pages/ProjectDetailPage";
+import ProjectRequirementsPage from "@/pages/ProjectRequirementsPage";
+import ProjectScenariosPage from "@/pages/ProjectScenariosPage";
 
 export default function App() {
   return (
@@ -20,6 +24,10 @@ export default function App() {
           <Route path="catalogue" element={<CatalogPage />} />
           <Route path="imports" element={<ImportsPage />} />
           <Route path="historique" element={<HistoryPage />} />
+          <Route path="projets" element={<ProjectsPage />} />
+          <Route path="projets/:projectId" element={<ProjectDetailPage />} />
+          <Route path="projets/:projectId/exigences" element={<ProjectRequirementsPage />} />
+          <Route path="projets/:projectId/scenarios" element={<ProjectScenariosPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

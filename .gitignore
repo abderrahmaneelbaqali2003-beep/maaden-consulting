@@ -84,3 +84,7 @@ desktop.ini
 # ignorer uniquement les exports temporaires generes par les imports
 # ============================================================
 data/processed/tmp_*
+
+# CPS/CCTP importes par les consultants : documents client potentiellement
+# confidentiels, jamais commits (analogue aux fichiers d'import Excel/CSV).
+backend/data/cps_uploads/

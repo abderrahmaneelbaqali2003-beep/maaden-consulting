@@ -5,14 +5,22 @@ from app.database.base import Base, TimestampMixin
 
 
 class Project(TimestampMixin, Base):
+    """Un projet de consulting (workflow CPS -> exigences -> etude -> scenarios -> rapport).
+
+    `status` : draft / requirements_review / study_in_progress / scenario_selection /
+    photometric_validation / validated / archived. Simple colonne String (pas d'enum SQL)
+    pour rester coherente avec le reste du modele (`RecommendationRun.status`, etc.).
+    """
+
     __tablename__ = "projects"
     __table_args__ = {"schema": "consulting"}
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    reference: Mapped[str | None] = mapped_column(String(50), unique=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     client_name: Mapped[str | None] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(30), default="active", nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="draft", nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
 
