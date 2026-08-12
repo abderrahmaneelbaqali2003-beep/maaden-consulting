@@ -13,6 +13,14 @@ from app.database.models.recommendation import RecommendationRun, Recommendation
 from app.database.models.saved_configuration import SavedConfiguration
 from app.database.models.audit import ImportHistory, DataIssue, ExpertValidation, DecisionHistory, GeneratedReport
 from app.database.models.rag import RagDocument, RagDocumentChunk
+from app.database.models.cps import (
+    CpsDocument,
+    CpsDocumentPage,
+    ExtractedRequirement,
+    ProjectScenario,
+    PhotometricValidation,
+    ProjectHistory,
+)
 
 __all__ = [
     "Manufacturer",
@@ -36,4 +44,10 @@ __all__ = [
     "GeneratedReport",
     "RagDocument",
     "RagDocumentChunk",
+    "CpsDocument",
+    "CpsDocumentPage",
+    "ExtractedRequirement",
+    "ProjectScenario",
+    "PhotometricValidation",
+    "ProjectHistory",
 ]

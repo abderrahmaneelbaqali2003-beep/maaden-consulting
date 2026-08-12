@@ -3,16 +3,25 @@ import type {
   AnalyzeResponse,
   CalculationInput,
   CalculationResult,
+  CpsDocumentOut,
   DashboardSummary,
   DataIssueEntry,
   Driver,
+  ExtractedRequirementOut,
   ImportHistoryEntry,
   ImportResponse,
   Lens,
   LedModule,
+  ManualRequirementCreateRequest,
   PaginatedResponse,
+  Project,
+  ProjectCreateRequest,
+  ProjectScenarioOut,
+  ProjectUpdateRequest,
   RecommendationRequest,
   RecommendationResponse,
+  RequirementUpdateRequest,
+  ScenarioSelectRequest,
   ValidateResultRequest,
 } from "@/types/api";
 
@@ -121,3 +130,77 @@ export const getImportHistory = (page = 1, page_size = 20) =>
 
 export const getImportIssues = (importId: number) =>
   apiClient.get<DataIssueEntry[]>(`/api/imports/${importId}/issues`).then((r) => r.data);
+
+// --- Projets (CPS -> exigences -> etude -> scenarios) ---
+
+export const createProject = (payload: ProjectCreateRequest) =>
+  apiClient.post<Project>("/api/projects", payload).then((r) => r.data);
+export const listProjects = (page = 1, page_size = 20) =>
+  apiClient.get<PaginatedResponse<Project>>("/api/projects", { params: { page, page_size } }).then((r) => r.data);
+export const getProject = (projectId: number) =>
+  apiClient.get<Project>(`/api/projects/${projectId}`).then((r) => r.data);
+export const updateProject = (projectId: number, payload: ProjectUpdateRequest) =>
+  apiClient.patch<Project>(`/api/projects/${projectId}`, payload).then((r) => r.data);
+
+export const uploadCpsDocument = (projectId: number, file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiClient
+    .post<CpsDocumentOut>(`/api/projects/${projectId}/documents/cps`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    .then((r) => r.data);
+};
+
+export const listCpsDocuments = (projectId: number) =>
+  apiClient.get<CpsDocumentOut[]>(`/api/projects/${projectId}/documents/cps`).then((r) => r.data);
+
+export const extractRequirements = (projectId: number, cpsDocumentId: number) =>
+  apiClient
+    .post<ExtractedRequirementOut[]>(`/api/projects/${projectId}/requirements/extract`, null, {
+      params: { cps_document_id: cpsDocumentId },
+    })
+    .then((r) => r.data);
+
+export const listRequirements = (projectId: number) =>
+  apiClient.get<ExtractedRequirementOut[]>(`/api/projects/${projectId}/requirements`).then((r) => r.data);
+
+export const addManualRequirement = (projectId: number, payload: ManualRequirementCreateRequest) =>
+  apiClient.post<ExtractedRequirementOut>(`/api/projects/${projectId}/requirements`, payload).then((r) => r.data);
+
+export const updateRequirement = (projectId: number, requirementId: number, payload: RequirementUpdateRequest) =>
+  apiClient
+    .patch<ExtractedRequirementOut>(`/api/projects/${projectId}/requirements/${requirementId}`, payload)
+    .then((r) => r.data);
+
+export const confirmRequirements = (projectId: number) =>
+  apiClient.post<Project>(`/api/projects/${projectId}/requirements/confirm`).then((r) => r.data);
+
+export const runStudy = (projectId: number, launchedBy?: string) =>
+  apiClient
+    .post<ProjectScenarioOut[]>(`/api/projects/${projectId}/study/run`, { launched_by: launchedBy ?? null })
+    .then((r) => r.data);
+
+export const listScenarios = (projectId: number) =>
+  apiClient.get<ProjectScenarioOut[]>(`/api/projects/${projectId}/scenarios`).then((r) => r.data);
+
+export const getProjectComparison = (projectId: number) =>
+  apiClient.get<ProjectScenarioOut[]>(`/api/projects/${projectId}/comparison`).then((r) => r.data);
+
+export const selectScenario = (projectId: number, scenarioId: number, payload: ScenarioSelectRequest) =>
+  apiClient
+    .post<ProjectScenarioOut>(`/api/projects/${projectId}/scenarios/${scenarioId}/select`, payload)
+    .then((r) => r.data);
+
+export const downloadProjectReport = async (projectId: number) => {
+  const response = await apiClient.get(`/api/projects/${projectId}/report.pdf`, { responseType: "blob" });
+  const filename = extractFilename(response.headers["content-disposition"], `MAADEN_Consulting_Report_${projectId}.pdf`);
+  const blobUrl = URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(blobUrl);
+};

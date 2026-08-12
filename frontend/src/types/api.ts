@@ -467,3 +467,108 @@ export interface DashboardSummary {
   recent_imports: ImportHistoryEntry[];
   recent_recommendations: RecommendationResponse[];
 }
+
+// --- Projets (CPS -> exigences -> etude -> scenarios) ---
+
+export type ProjectStatus =
+  | "draft"
+  | "requirements_review"
+  | "study_in_progress"
+  | "scenario_selection"
+  | "photometric_validation"
+  | "validated"
+  | "archived";
+
+export interface Project {
+  id: number;
+  reference: string | null;
+  name: string;
+  client_name: string | null;
+  description: string | null;
+  status: ProjectStatus;
+  created_at: string;
+  updated_at: string;
+  cps_document_count: number;
+  requirement_count: number;
+  scenario_count: number;
+  selected_scenario_code: string | null;
+}
+
+export interface ProjectCreateRequest {
+  name: string;
+  client_name?: string | null;
+  description?: string | null;
+}
+
+export interface ProjectUpdateRequest {
+  name?: string;
+  client_name?: string | null;
+  description?: string | null;
+  status?: ProjectStatus;
+}
+
+export interface CpsDocumentOut {
+  id: number;
+  project_id: number;
+  original_filename: string;
+  document_type: string;
+  page_count: number;
+  uploaded_at: string;
+  extraction_status: "pending" | "extracted" | "insufficient_text" | "failed";
+  extraction_message: string | null;
+}
+
+export type RequirementValidationStatus = "detected" | "confirmed" | "modified" | "ignored" | "manual";
+
+export interface ExtractedRequirementOut {
+  id: number;
+  project_id: number;
+  cps_document_id: number | null;
+  category: string;
+  scope: string;
+  field_name: string;
+  operator: string;
+  raw_value: string;
+  numeric_value: number | null;
+  unit: string | null;
+  source_page: number | null;
+  source_excerpt: string | null;
+  extraction_confidence: "high" | "medium" | "low";
+  validation_status: RequirementValidationStatus;
+  validated_value: string | null;
+  validated_by: string | null;
+  validated_at: string | null;
+}
+
+export interface RequirementUpdateRequest {
+  action: "confirm" | "modify" | "ignore";
+  validated_value?: string | null;
+  validated_by: string;
+}
+
+export interface ManualRequirementCreateRequest {
+  category: string;
+  scope: string;
+  field_name: string;
+  operator?: string;
+  value: string;
+  unit?: string | null;
+  validated_by: string;
+}
+
+export interface ProjectScenarioOut {
+  id: number;
+  project_id: number;
+  scenario_code: string;
+  selected: boolean;
+  selected_by: string | null;
+  selected_at: string | null;
+  selection_comment: string | null;
+  recommendation: RecommendationItem;
+  run_id: number;
+}
+
+export interface ScenarioSelectRequest {
+  selected_by: string;
+  selection_comment?: string | null;
+}

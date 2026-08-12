@@ -9,6 +9,7 @@ from app.api.routes import (
     imports,
     lenses,
     modules,
+    projects,
     rag,
     recommendation_results,
     recommendations,
@@ -46,6 +47,7 @@ app.include_router(rag.router)
 app.include_router(calculations.router)
 app.include_router(recommendation_results.router)
 app.include_router(reports.router)
+app.include_router(projects.router)
 
 
 @app.get("/api/health", tags=["health"])
