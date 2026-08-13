@@ -32,6 +32,7 @@ function buildRequirement(overrides: Partial<ExtractedRequirementOut> = {}): Ext
     raw_value: "6000",
     numeric_value: 6000,
     unit: "lm",
+    source_type: "cps",
     source_page: 41,
     source_excerpt: "flux allant jusqu'a 6000 lumens",
     extraction_confidence: "medium",

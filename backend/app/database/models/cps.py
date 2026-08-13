@@ -69,6 +69,9 @@ class ExtractedRequirement(TimestampMixin, Base):
     category: Mapped[str] = mapped_column(String(30), nullable=False)  # lighting/electrical/luminaire/geometry/...
     scope: Mapped[str] = mapped_column(String(30), nullable=False)
     field_name: Mapped[str] = mapped_column(String(60), nullable=False)
+    # cps / natural_language / manual -- origine de l'exigence, jamais perdue meme apres
+    # confirmation (necessaire pour detecter un conflit entre deux sources, section 30).
+    source_type: Mapped[str] = mapped_column(String(20), default="cps", nullable=False)
     operator: Mapped[str] = mapped_column(String(5), default="==", nullable=False)  # <=, >=, ==
     raw_value: Mapped[str] = mapped_column(String(255), nullable=False)
     numeric_value: Mapped[float | None] = mapped_column(Float)
@@ -102,6 +105,11 @@ class ProjectScenario(TimestampMixin, Base):
         ForeignKey("consulting.recommendation_results.id", ondelete="CASCADE"), nullable=False
     )
     scenario_code: Mapped[str] = mapped_column(String(1), nullable=False)  # A / B / C
+
+    # preliminary / final -- miroir de RecommendationRun.run_type au moment de la creation,
+    # pour filtrer sans jointure supplementaire dans les listings. Un scenario preliminaire
+    # ne peut jamais etre selectionne (voir la garde dans l'endpoint de selection).
+    run_type: Mapped[str] = mapped_column(String(20), default="final", nullable=False)
 
     selected: Mapped[bool] = mapped_column(default=False, nullable=False)
     selected_by: Mapped[str | None] = mapped_column(String(150))

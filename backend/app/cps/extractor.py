@@ -11,7 +11,7 @@ import re
 
 from app.cps import patterns as p
 from app.cps.models import ExtractedRequirementDraft
-from app.cps.normalizer import parse_french_number
+from app.domain.normalizer import parse_french_number
 from app.rag.parsing import ParsedPage
 
 MAX_EXCERPT_LENGTH = 220

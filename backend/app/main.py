@@ -1,7 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from app.ai.exceptions import AI_UNAVAILABLE_MESSAGE, AIInterpretationError
 from app.api.routes import (
+    ai,
     calculations,
     configurator,
     dashboard,
@@ -48,6 +51,16 @@ app.include_router(calculations.router)
 app.include_router(recommendation_results.router)
 app.include_router(reports.router)
 app.include_router(projects.router)
+app.include_router(ai.router)
+
+
+@app.exception_handler(AIInterpretationError)
+async def ai_interpretation_error_handler(request: Request, exc: AIInterpretationError) -> JSONResponse:
+    """Filet de securite global : une erreur Groq peut survenir des la resolution de la
+    dependance `get_requirement_interpreter` (avant meme le corps de la route), donc
+    hors de portee d'un simple try/except local. Ne fait jamais planter l'application
+    (jamais de 500) : degrade toujours vers un message clair (section 22 du besoin)."""
+    return JSONResponse(status_code=503, content={"detail": AI_UNAVAILABLE_MESSAGE})
 
 
 @app.get("/api/health", tags=["health"])

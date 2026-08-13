@@ -1,7 +1,7 @@
 """Tests de l'extraction deterministe CPS/CCTP (regex, aucun LLM)."""
 
 from app.cps.extractor import CpsExtractor
-from app.cps.normalizer import parse_french_number
+from app.domain.normalizer import parse_french_number
 from app.rag.parsing import ParsedPage
 
 REAL_CCTP_EXCERPT_P41 = """

@@ -11,6 +11,7 @@ import ProjectsPage from "@/pages/ProjectsPage";
 import ProjectDetailPage from "@/pages/ProjectDetailPage";
 import ProjectRequirementsPage from "@/pages/ProjectRequirementsPage";
 import ProjectScenariosPage from "@/pages/ProjectScenariosPage";
+import AiAssistantPage from "@/pages/AiAssistantPage";
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="projets/:projectId" element={<ProjectDetailPage />} />
           <Route path="projets/:projectId/exigences" element={<ProjectRequirementsPage />} />
           <Route path="projets/:projectId/scenarios" element={<ProjectScenariosPage />} />
+          <Route path="assistant-ia" element={<AiAssistantPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

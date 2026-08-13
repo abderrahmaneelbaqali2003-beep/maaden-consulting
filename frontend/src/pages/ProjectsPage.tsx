@@ -18,6 +18,7 @@ import type { Project, ProjectStatus } from "@/types/api";
 const STATUS_CONFIG: Record<ProjectStatus, { label: string; variant: "success" | "warning" | "info" | "accent" | "default" }> = {
   draft: { label: "Brouillon", variant: "default" },
   requirements_review: { label: "Exigences en revue", variant: "info" },
+  preliminary_analysis: { label: "Pre-analyse CPS", variant: "info" },
   study_in_progress: { label: "Etude en cours", variant: "info" },
   scenario_selection: { label: "Selection du scenario", variant: "accent" },
   photometric_validation: { label: "Validation photometrique", variant: "warning" },

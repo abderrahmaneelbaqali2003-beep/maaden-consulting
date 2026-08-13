@@ -7,6 +7,7 @@ from app.schemas.recommendation import RecommendationItem
 PROJECT_STATUSES = [
     "draft",
     "requirements_review",
+    "preliminary_analysis",
     "study_in_progress",
     "scenario_selection",
     "photometric_validation",
@@ -39,7 +40,10 @@ class ProjectOut(BaseModel):
     updated_at: datetime
     cps_document_count: int = 0
     requirement_count: int = 0
-    scenario_count: int = 0
+    requirements_confirmed_count: int = 0
+    requirements_to_review_count: int = 0
+    preliminary_scenario_count: int = 0
+    scenario_count: int = 0  # nombre de scenarios de l'etude DEFINITIVE (comportement historique)
     selected_scenario_code: str | None = None
 
 
@@ -69,6 +73,7 @@ class ExtractedRequirementOut(BaseModel):
     raw_value: str
     numeric_value: float | None
     unit: str | None
+    source_type: str  # cps / natural_language / manual
     source_page: int | None
     source_excerpt: str | None
     extraction_confidence: str
@@ -102,6 +107,7 @@ class ProjectScenarioOut(BaseModel):
     id: int
     project_id: int
     scenario_code: str
+    run_type: str  # "preliminary" (pre-analyse, jamais selectionnable) ou "final"
     selected: bool
     selected_by: str | None
     selected_at: datetime | None
@@ -113,3 +119,24 @@ class ProjectScenarioOut(BaseModel):
 class ScenarioSelectRequest(BaseModel):
     selected_by: str = Field(..., min_length=1)
     selection_comment: str | None = None
+
+
+class MissingFieldOut(BaseModel):
+    field: str
+    label: str
+
+
+class RequirementsAnalysisOut(BaseModel):
+    can_run_preliminary_study: bool
+    missing_fields: list[MissingFieldOut]
+    requirements_detected_count: int
+    requirements_confirmed_count: int
+    requirements_to_review_count: int
+
+
+class CpsAnalysisResponse(BaseModel):
+    document: CpsDocumentOut | None = None
+    requirements: list[ExtractedRequirementOut] | None = None
+    analysis: RequirementsAnalysisOut
+    scenarios: list[ProjectScenarioOut]
+

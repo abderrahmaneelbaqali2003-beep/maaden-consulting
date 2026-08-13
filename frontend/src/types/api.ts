@@ -473,6 +473,7 @@ export interface DashboardSummary {
 export type ProjectStatus =
   | "draft"
   | "requirements_review"
+  | "preliminary_analysis"
   | "study_in_progress"
   | "scenario_selection"
   | "photometric_validation"
@@ -490,6 +491,9 @@ export interface Project {
   updated_at: string;
   cps_document_count: number;
   requirement_count: number;
+  requirements_confirmed_count: number;
+  requirements_to_review_count: number;
+  preliminary_scenario_count: number;
   scenario_count: number;
   selected_scenario_code: string | null;
 }
@@ -519,6 +523,7 @@ export interface CpsDocumentOut {
 }
 
 export type RequirementValidationStatus = "detected" | "confirmed" | "modified" | "ignored" | "manual";
+export type RequirementSourceType = "cps" | "natural_language" | "manual";
 
 export interface ExtractedRequirementOut {
   id: number;
@@ -531,6 +536,7 @@ export interface ExtractedRequirementOut {
   raw_value: string;
   numeric_value: number | null;
   unit: string | null;
+  source_type: RequirementSourceType;
   source_page: number | null;
   source_excerpt: string | null;
   extraction_confidence: "high" | "medium" | "low";
@@ -556,10 +562,13 @@ export interface ManualRequirementCreateRequest {
   validated_by: string;
 }
 
+export type ScenarioRunType = "preliminary" | "final";
+
 export interface ProjectScenarioOut {
   id: number;
   project_id: number;
   scenario_code: string;
+  run_type: ScenarioRunType;
   selected: boolean;
   selected_by: string | null;
   selected_at: string | null;
@@ -571,4 +580,61 @@ export interface ProjectScenarioOut {
 export interface ScenarioSelectRequest {
   selected_by: string;
   selection_comment?: string | null;
+}
+
+export interface MissingFieldOut {
+  field: string;
+  label: string;
+}
+
+export interface RequirementsAnalysisOut {
+  can_run_preliminary_study: boolean;
+  missing_fields: MissingFieldOut[];
+  requirements_detected_count: number;
+  requirements_confirmed_count: number;
+  requirements_to_review_count: number;
+}
+
+export interface CpsAnalysisResponse {
+  document: CpsDocumentOut | null;
+  requirements: ExtractedRequirementOut[] | null;
+  analysis: RequirementsAnalysisOut;
+  scenarios: ProjectScenarioOut[];
+}
+
+// --- Assistant IA (Groq) : autonome, ne depend d'aucun Projet ni du CPS ---
+
+export interface AiFieldOut {
+  field_name: string;
+  scope: string;
+  label: string;
+  request_attr: string; // attribut correspondant sur RecommendationRequest
+  operator: string;
+  value: string | number | null;
+  numeric_value: number | null;
+  unit: string | null;
+  confidence: "high" | "medium" | "low";
+  source_text: string;
+}
+
+export interface AiAmbiguousFieldOut {
+  field_name: string | null;
+  scope: string | null;
+  source_text: string;
+  message: string;
+}
+
+export interface AiMissingFieldOut {
+  request_attr: string;
+  label: string;
+}
+
+export interface AiInterpretResponse {
+  fields: AiFieldOut[];
+  ambiguous_fields: AiAmbiguousFieldOut[];
+  // Recap redige par le modele IA de ce qu'il a compris du texte (jamais une
+  // recommandation produit/score).
+  summary: string | null;
+  missing_fields: AiMissingFieldOut[];
+  can_search: boolean;
 }

@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 25
     allowed_document_types: str = "pdf,docx,txt,md,csv,xlsx"
 
+    # --- V2 : assistant IA (Groq) pour la saisie en langage naturel ---
+    # Le LLM n'est jamais le moteur de decision : il transforme uniquement un texte
+    # libre en exigences structurees, revalidees par Pydantic puis par la liste
+    # blanche `app/cps/field_definitions.py` avant toute persistance.
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_timeout_seconds: int = 30
+    groq_enabled: bool = True
+
     @property
     def allowed_document_types_list(self) -> list[str]:
         return [t.strip() for t in self.allowed_document_types.split(",") if t.strip()]

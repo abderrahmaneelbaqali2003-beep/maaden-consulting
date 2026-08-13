@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, FileDown, Loader2 } from "lucide-react";
+import { ArrowLeft, AlertTriangle, CheckCircle2, FileDown, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { LoadingState } from "@/components/LoadingState";
 import { ErrorState } from "@/components/ErrorState";
@@ -78,10 +78,16 @@ function SelectScenarioDialog({
   );
 }
 
-function ScenarioCard({ scenario, onSelect }: { scenario: ProjectScenarioOut; onSelect: () => void }) {
+function ScenarioCard({ scenario, onSelect }: { scenario: ProjectScenarioOut; onSelect?: () => void }) {
   const item = scenario.recommendation;
+  const isPreliminary = scenario.run_type === "preliminary";
   return (
-    <Card className={cn(scenario.selected && "border-secondary shadow-[0_6px_18px_rgba(201,154,50,0.10)]")}>
+    <Card
+      className={cn(
+        scenario.selected && "border-secondary shadow-[0_6px_18px_rgba(201,154,50,0.10)]",
+        isPreliminary && "border-dashed"
+      )}
+    >
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Scenario {scenario.scenario_code}</CardTitle>
         <span className="text-lg font-semibold text-secondary">{item.overall_score}/100</span>
@@ -119,7 +125,9 @@ function ScenarioCard({ scenario, onSelect }: { scenario: ProjectScenarioOut; on
         )}
 
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          {scenario.selected ? (
+          {isPreliminary ? (
+            <Badge variant="accent">PRELIMINAIRE</Badge>
+          ) : scenario.selected ? (
             <Badge variant="success">
               <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> SCENARIO RETENU
             </Badge>
@@ -129,11 +137,54 @@ function ScenarioCard({ scenario, onSelect }: { scenario: ProjectScenarioOut; on
             </Button>
           )}
           <Link to={`/resultats/${scenario.run_id}`} className="text-sm text-accent-foreground hover:underline">
-            Voir le detail / valider
+            Voir le detail{!isPreliminary && " / valider"}
           </Link>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function PreliminaryDisclaimer() {
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-warning-bg bg-warning-bg p-3 text-sm text-warning">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      <p>
+        Ces resultats sont bases sur l'extraction automatique du CPS. Ils doivent etre confirmes apres validation des
+        exigences par le consultant.
+      </p>
+    </div>
+  );
+}
+
+function PreliminaryVsFinalDiffNote({ preliminary, final }: { preliminary: ProjectScenarioOut[]; final: ProjectScenarioOut[] }) {
+  if (preliminary.length === 0 || final.length === 0) return null;
+
+  const changes = final
+    .map((finalScenario) => {
+      const match = preliminary.find((p) => p.scenario_code === finalScenario.scenario_code);
+      if (!match) return null;
+      const driverChanged = match.recommendation.driver.id !== finalScenario.recommendation.driver.id;
+      const moduleChanged = match.recommendation.module.id !== finalScenario.recommendation.module.id;
+      if (!driverChanged && !moduleChanged) return null;
+      return { code: finalScenario.scenario_code, before: match.recommendation, after: finalScenario.recommendation };
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null);
+
+  if (changes.length === 0) return null;
+
+  return (
+    <div className="mt-4 rounded-md border border-info-bg bg-info-bg p-3 text-sm text-info">
+      <p className="mb-1 font-medium">La validation des exigences a modifie la recommandation.</p>
+      <ul className="space-y-1">
+        {changes.map((c) => (
+          <li key={c.code}>
+            Scenario {c.code} — Pre-analyse : {c.before.driver.reference} + {c.before.module.reference} → Etude finale :{" "}
+            {c.after.driver.reference} + {c.after.module.reference}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -234,7 +285,9 @@ export default function ProjectScenariosPage() {
   if (loading) return <LoadingState rows={5} />;
   if (error) return <ErrorState message={error} onRetry={load} />;
 
-  const selected = scenarios.find((s) => s.selected);
+  const preliminaryScenarios = scenarios.filter((s) => s.run_type === "preliminary");
+  const finalScenarios = scenarios.filter((s) => s.run_type === "final");
+  const selected = finalScenarios.find((s) => s.selected);
 
   return (
     <div>
@@ -244,7 +297,7 @@ export default function ProjectScenariosPage() {
 
       <PageHeader
         title="Scenarios techniques"
-        description={project ? `${scenarios.length} scenario(s) etudie(s) pour ${project.name}` : undefined}
+        description={project ? `${finalScenarios.length} scenario(s) definitif(s) pour ${project.name}` : undefined}
       />
 
       {scenarios.length === 0 ? (
@@ -254,47 +307,71 @@ export default function ProjectScenariosPage() {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {scenarios.map((s) => (
-              <ScenarioCard key={s.id} scenario={s} onSelect={() => setDialogScenario(s)} />
-            ))}
-          </div>
+          {preliminaryScenarios.length > 0 && (
+            <div className="mb-8">
+              <h2 className="mb-2 text-base font-semibold text-foreground">Resultats preliminaires</h2>
+              <div className="mb-3">
+                <PreliminaryDisclaimer />
+              </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                {preliminaryScenarios.map((s) => (
+                  <ScenarioCard key={s.id} scenario={s} />
+                ))}
+              </div>
+            </div>
+          )}
 
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Comparaison</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <ComparisonTable scenarios={scenarios} />
-            </CardContent>
-          </Card>
+          {finalScenarios.length > 0 ? (
+            <div>
+              <h2 className="mb-2 text-base font-semibold text-foreground">Resultats definitifs</h2>
+              <PreliminaryVsFinalDiffNote preliminary={preliminaryScenarios} final={finalScenarios} />
+              <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                {finalScenarios.map((s) => (
+                  <ScenarioCard key={s.id} scenario={s} onSelect={() => setDialogScenario(s)} />
+                ))}
+              </div>
 
-          {selected && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Rapport final du projet</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 pt-0">
-                <p className="text-sm text-muted-foreground">
-                  Scenario retenu : {selected.scenario_code}. Validez d'abord la configuration depuis la page Resultats, puis
-                  telechargez le rapport du projet.
-                </p>
-                <div className="flex items-center gap-3">
-                  <Button variant="outline" onClick={handleDownload} disabled={downloading}>
-                    {downloading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Generation...
-                      </>
-                    ) : (
-                      <>
-                        <FileDown className="h-4 w-4" aria-hidden="true" /> Telecharger le rapport du projet
-                      </>
-                    )}
-                  </Button>
-                  {downloadError && <span className="text-sm text-destructive">{downloadError}</span>}
-                </div>
-              </CardContent>
-            </Card>
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Comparaison</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <ComparisonTable scenarios={finalScenarios} />
+                </CardContent>
+              </Card>
+
+              {selected && (
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle>Rapport final du projet</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 pt-0">
+                    <p className="text-sm text-muted-foreground">
+                      Scenario retenu : {selected.scenario_code}. Validez d'abord la configuration depuis la page Resultats, puis
+                      telechargez le rapport du projet.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <Button variant="outline" onClick={handleDownload} disabled={downloading}>
+                        {downloading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Generation...
+                          </>
+                        ) : (
+                          <>
+                            <FileDown className="h-4 w-4" aria-hidden="true" /> Telecharger le rapport du projet
+                          </>
+                        )}
+                      </Button>
+                      {downloadError && <span className="text-sm text-destructive">{downloadError}</span>}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Etude definitive en attente : validez les exigences puis lancez l'etude depuis la page des exigences.
+            </p>
           )}
         </>
       )}

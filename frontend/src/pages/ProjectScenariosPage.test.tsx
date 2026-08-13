@@ -36,6 +36,7 @@ function buildScenario(overrides: Partial<ProjectScenarioOut> = {}): ProjectScen
     id: 1,
     project_id: 7,
     scenario_code: "A",
+    run_type: "final",
     selected: false,
     selected_by: null,
     selected_at: null,
@@ -50,7 +51,8 @@ function buildProject(overrides: Partial<Project> = {}): Project {
   return {
     id: 7, reference: "MC-PROJ-2026-0001", name: "BHNS Rabat", client_name: "RRM", description: null,
     status: "scenario_selection", created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-    cps_document_count: 1, requirement_count: 5, scenario_count: 2, selected_scenario_code: null,
+    cps_document_count: 1, requirement_count: 5, requirements_confirmed_count: 5, requirements_to_review_count: 0,
+    preliminary_scenario_count: 0, scenario_count: 2, selected_scenario_code: null,
     ...overrides,
   };
 }
@@ -122,5 +124,30 @@ describe("ProjectScenariosPage", () => {
     await user.click(button);
 
     await waitFor(() => expect(downloadProjectReport).toHaveBeenCalledWith(7));
+  });
+
+  it("affiche les scenarios preliminaires dans leur propre section avec un badge et sans bouton de selection", async () => {
+    vi.mocked(getProject).mockResolvedValue(buildProject({ preliminary_scenario_count: 1, scenario_count: 0 }));
+    vi.mocked(listScenarios).mockResolvedValue([
+      buildScenario({ id: 1, scenario_code: "A", run_type: "preliminary" }),
+    ]);
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("Resultats preliminaires")).toBeInTheDocument());
+    expect(screen.getByText("PRELIMINAIRE")).toBeInTheDocument();
+    expect(screen.getByText(/doivent etre confirmes apres validation/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Selectionner ce scenario/i })).not.toBeInTheDocument();
+  });
+
+  it("separe les scenarios preliminaires et definitifs et affiche l'etude finale en attente sans resultats finaux", async () => {
+    vi.mocked(getProject).mockResolvedValue(buildProject({ preliminary_scenario_count: 1, scenario_count: 0 }));
+    vi.mocked(listScenarios).mockResolvedValue([
+      buildScenario({ id: 1, scenario_code: "A", run_type: "preliminary" }),
+    ]);
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("Resultats preliminaires")).toBeInTheDocument());
+    expect(screen.getByText(/Etude definitive en attente/i)).toBeInTheDocument();
+    expect(screen.queryByText("Comparaison")).not.toBeInTheDocument();
   });
 });
