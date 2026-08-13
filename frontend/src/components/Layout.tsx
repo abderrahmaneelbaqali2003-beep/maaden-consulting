@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, Calculator, GitCompare, Boxes, UploadCloud, History, FolderKanban } from "lucide-react";
+import { LayoutDashboard, Calculator, GitCompare, Boxes, UploadCloud, History, FolderKanban, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppLogo } from "@/components/AppLogo";
 import { TopHeader } from "@/components/TopHeader";
@@ -8,6 +8,7 @@ import { TopHeader } from "@/components/TopHeader";
 const NAV_ITEMS = [
   { to: "/", label: "Tableau de bord", icon: LayoutDashboard, end: true },
   { to: "/projets", label: "Projets", icon: FolderKanban },
+  { to: "/assistant-ia", label: "Assistant IA", icon: Bot },
   { to: "/nouveau-calcul", label: "Nouveau calcul", icon: Calculator },
   { to: "/comparaison", label: "Comparaison", icon: GitCompare },
   { to: "/catalogue", label: "Catalogue", icon: Boxes },
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
 
 const PAGE_TITLES: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => p === "/", label: "Tableau de bord" },
+  { test: (p) => p.startsWith("/assistant-ia"), label: "Assistant IA" },
   { test: (p) => p.startsWith("/projets"), label: "Projets" },
   { test: (p) => p.startsWith("/nouveau-calcul"), label: "Nouveau calcul" },
   { test: (p) => p.startsWith("/comparaison"), label: "Comparaison" },

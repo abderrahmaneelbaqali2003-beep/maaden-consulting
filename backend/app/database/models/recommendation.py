@@ -21,6 +21,10 @@ class RecommendationRun(TimestampMixin, Base):
     request_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), unique=True, default=uuid.uuid4, nullable=False)
     requirement_id: Mapped[int] = mapped_column(ForeignKey("consulting.project_requirements.id"), nullable=False)
 
+    # preliminary (pre-analyse CPS automatique, jamais selectionnable/validable) / final
+    # (etude definitive, la seule dont le resultat peut etre selectionne puis valide/rapporte).
+    run_type: Mapped[str] = mapped_column(String(20), default="final", nullable=False)
+
     status: Mapped[str] = mapped_column(String(40), nullable=False)
     # compatible / compatible_with_warning / data_incomplete / manual_validation_required / not_compatible / impossible
     message: Mapped[str | None] = mapped_column(Text)

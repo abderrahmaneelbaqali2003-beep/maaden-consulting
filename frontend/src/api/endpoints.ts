@@ -1,8 +1,10 @@
 import { apiClient } from "@/api/client";
 import type {
+  AiInterpretResponse,
   AnalyzeResponse,
   CalculationInput,
   CalculationResult,
+  CpsAnalysisResponse,
   CpsDocumentOut,
   DashboardSummary,
   DataIssueEntry,
@@ -61,6 +63,13 @@ export const deleteLens = (id: number) => apiClient.delete(`/api/lenses/${id}`);
 // --- Recommandations ---
 export const createRecommendation = (payload: RecommendationRequest) =>
   apiClient.post<RecommendationResponse>("/api/recommendations", payload).then((r) => r.data);
+
+// --- Assistant IA (autonome, aucun Projet requis) : texte libre -> exigences
+// structurees (backend uniquement, jamais d'appel Groq direct depuis le frontend). Le
+// resultat est ensuite transmis a `createRecommendation` (meme moteur que "Nouveau
+// calcul") pour obtenir les configurations compatibles. */
+export const interpretText = (text: string) =>
+  apiClient.post<AiInterpretResponse>("/api/ai/interpret", { text }).then((r) => r.data);
 export const getRecommendation = (id: number) =>
   apiClient.get<RecommendationResponse>(`/api/recommendations/${id}`).then((r) => r.data);
 export const getRecommendationHistory = (page = 1, page_size = 10) =>
@@ -154,6 +163,23 @@ export const uploadCpsDocument = (projectId: number, file: File) => {
 
 export const listCpsDocuments = (projectId: number) =>
   apiClient.get<CpsDocumentOut[]>(`/api/projects/${projectId}/documents/cps`).then((r) => r.data);
+
+/** Action unique "Importer et analyser le CPS" : upload + extraction + pre-analyse
+ * automatique en un seul appel (jusqu'a 3 configurations provisoires si possible). */
+export const analyzeCpsDocument = (projectId: number, file: File, launchedBy?: string) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiClient
+    .post<CpsAnalysisResponse>(`/api/projects/${projectId}/cps/analyze`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      params: launchedBy ? { launched_by: launchedBy } : undefined,
+    })
+    .then((r) => r.data);
+};
+
+/** Relance la pre-analyse sans nouvel upload (ex: apres completion manuelle rapide). */
+export const rerunPreliminaryStudy = (projectId: number) =>
+  apiClient.post<CpsAnalysisResponse>(`/api/projects/${projectId}/cps/preliminary-study`).then((r) => r.data);
 
 export const extractRequirements = (projectId: number, cpsDocumentId: number) =>
   apiClient
